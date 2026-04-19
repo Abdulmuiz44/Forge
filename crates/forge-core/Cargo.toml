@@ -1,0 +1,14 @@
+[package]
+name = "forge-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+reqwest = { workspace = true }
+chrono = { workspace = true }
+uuid = { version = "1.7", features = ["v4", "fast-rng"] }
+forge-protocol = { path = "../forge-protocol" }
+forge-tools = { path = "../forge-tools" }

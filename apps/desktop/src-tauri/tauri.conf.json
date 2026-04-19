@@ -1,0 +1,22 @@
+{
+  "productName": "Forge",
+  "version": "0.1.0",
+  "identifier": "com.forge.dev",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Forge Native",
+        "width": 1200,
+        "height": 800,
+        "decorations": true,
+        "transparent": false
+      }
+    ]
+  }
+}

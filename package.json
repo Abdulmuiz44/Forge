@@ -1,0 +1,12 @@
+{
+  "name": "forge-monorepo",
+  "private": true,
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "build": "pnpm -r run build"
+  }
+}
