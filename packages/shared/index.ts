@@ -126,7 +126,58 @@ export interface VerificationState {
 // INTEGRATION ADDITIONS (REPAIR, BROWSER, DEPLOY)
 export type RepairAttemptStatus = 'pending' | 'running' | 'awaiting_approval' | 'applied' | 'verifying' | 'failed' | 'exhausted' | 'completed';
 export type DeployTargetKind = 'node_web_app' | 'static_site' | 'tauri_desktop' | 'rust_service' | 'unknown';
-export type BrowserSessionStatus = 'disconnected' | 'attached' | 'running';
+export type BrowserSessionStatus = 'idle' | 'launching' | 'connecting' | 'ready' | 'navigating' | 'busy' | 'disconnected' | 'failed' | 'closed';
+export type BrowserActionKind = 'open_url' | 'click_selector' | 'type_selector' | 'wait_for_selector' | 'extract_text' | 'capture_screenshot' | 'get_page_state';
+export type BrowserArtifactKind = 'screenshot' | 'page_snapshot' | 'event_log' | 'extracted_text';
+
+export interface BrowserTargetInfo {
+  url: string;
+  title: string;
+}
+
+export interface BrowserPageState {
+  url: string;
+  title: string;
+  canGoBack: boolean;
+  canGoForward: boolean;
+}
+
+export interface BrowserActionRequest {
+  id: string;
+  kind: BrowserActionKind;
+  value: string;
+  textInput?: string;
+}
+
+export interface BrowserActionResult {
+  actionId: string;
+  success: boolean;
+  message: string;
+  artifactPath?: string;
+  screenshotBase64?: string;
+}
+
+export interface BrowserEventLogEntry {
+  timestamp: string;
+  actionId: string;
+  kind: BrowserActionKind;
+  success: boolean;
+  message: string;
+}
+
+export interface BrowserArtifact {
+  id: string;
+  kind: BrowserArtifactKind;
+  path: string;
+  timestamp: string;
+  metadata?: any;
+}
+
+export interface BrowserSessionState {
+  status: BrowserSessionStatus;
+  currentTarget?: BrowserTargetInfo;
+  lastError?: string;
+}
 
 export interface RepairAttempt {
   id: string;
@@ -145,15 +196,11 @@ export interface DeployPrepSummary {
   risks: string[];
 }
 
-export interface BrowserActionRequest {
-  actionKind: 'open_url' | 'click_selector' | 'type_selector' | 'extract_text' | 'capture_screenshot';
-  value: string;
-}
-
-export interface BrowserActionResult {
-  success: boolean;
-  message: string;
-  screenshotBase64?: string;
+export interface AppBootData {
+  lastWorkspace?: WorkspaceSummary;
+  activePlan?: ExecutionPlan;
+  activeExecution?: ExecutionState;
+  providerConfig?: ProviderConfig;
 }
 
 // PROVIDER DOMAIN TYPES

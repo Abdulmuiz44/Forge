@@ -8,6 +8,7 @@ pub mod repair;
 pub mod deploy;
 pub mod prompts;
 pub mod provider_config;
+pub mod config;
 
 pub struct ExecutionContext {
     pub task_id: String,

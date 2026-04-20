@@ -14,12 +14,15 @@ use forge_core::provider::{
     create_provider, LiveProvider, EchoMockProvider, IntelligenceProvider,
 };
 use forge_core::provider_config::ProviderConfigService;
+use forge_core::config::{GlobalConfigService, GlobalConfig};
 use forge_browser::LocalBrowserService;
 
 struct AppState {
     workspace_root: Mutex<Option<String>>,
     provider_config: Mutex<Option<ProviderConfig>>,
     provider_api_key: Mutex<Option<String>>,
+    browser: Mutex<LocalBrowserService>,
+    global_config: Mutex<GlobalConfigService>,
 }
 
 // --- Centralized provider instantiation ---
@@ -76,6 +79,9 @@ fn check_health() -> String {
 #[tauri::command]
 fn open_workspace(path: String, state: State<'_, AppState>) -> Result<WorkspaceSummary, String> {
     *state.workspace_root.lock().unwrap() = Some(path.clone());
+    let _ = state.global_config.lock().unwrap().set_last_workspace(path.clone());
+
+    // Auto-load provider config from workspace .forge/ if it exists
 
     // Auto-load provider config from workspace .forge/ if it exists
     let config_svc = ProviderConfigService::new(&path);
@@ -94,6 +100,50 @@ fn open_workspace(path: String, state: State<'_, AppState>) -> Result<WorkspaceS
         id: "local-ws".to_string(),
         root_path: path,
     })
+}
+
+#[tauri::command]
+fn get_app_boot_data(state: State<'_, AppState>) -> Result<AppBootData, String> {
+    let global = state.global_config.lock().unwrap().load();
+    let mut boot_data = AppBootData {
+        last_workspace: None,
+        active_plan: None,
+        active_execution: None,
+        provider_config: None,
+    };
+
+    if let Some(path) = global.last_workspace_path {
+        // Attempt to auto-open
+        if let Ok(ws) = open_workspace(path.clone(), state.clone()) {
+            boot_data.last_workspace = Some(ws);
+            boot_data.provider_config = state.provider_config.lock().unwrap().clone();
+
+            // Check for existing plan/execution
+            let planner = PlannerService::new(&path, &EchoMockProvider::new());
+            let plans_dir = std::path::PathBuf::from(&path).join(".forge").join("plans");
+            if let Ok(entries) = std::fs::read_dir(plans_dir) {
+                // Find most recent plan
+                let mut latest_plan = None;
+                for entry in entries.flatten() {
+                    if let Ok(p) = std::fs::read_to_string(entry.path()) {
+                        if let Ok(plan) = serde_json::from_str::<ExecutionPlan>(&p) {
+                            latest_plan = Some(plan);
+                        }
+                    }
+                }
+                boot_data.active_plan = latest_plan;
+            }
+
+            // Check for execution state
+            use forge_core::executor::ExecutionPersistenceService;
+            let persistence = ExecutionPersistenceService::new(&path);
+            if let Ok(st) = persistence.load_state() {
+                boot_data.active_execution = Some(st);
+            }
+        }
+    }
+
+    Ok(boot_data)
 }
 
 #[tauri::command]
@@ -264,8 +314,31 @@ fn prepare_deployment(state: State<'_, AppState>) -> Result<DeployPrepSummary, S
 }
 
 #[tauri::command]
-fn execute_browser_action(action: BrowserActionRequest, _state: State<'_, AppState>) -> Result<BrowserActionResult, String> {
-    let browser = LocalBrowserService::new();
+fn browser_launch_session(state: State<'_, AppState>) -> Result<BrowserSessionState, String> {
+    let ws = state.workspace_root.lock().unwrap().clone()
+        .ok_or_else(|| "No workspace opened".to_string())?;
+    
+    let mut browser = state.browser.lock().unwrap();
+    browser.launch(std::path::PathBuf::from(ws))?;
+    Ok(browser.get_state())
+}
+
+#[tauri::command]
+fn browser_close_session(state: State<'_, AppState>) -> Result<BrowserSessionState, String> {
+    let mut browser = state.browser.lock().unwrap();
+    browser.close()?;
+    Ok(browser.get_state())
+}
+
+#[tauri::command]
+fn browser_get_session_state(state: State<'_, AppState>) -> Result<BrowserSessionState, String> {
+    let browser = state.browser.lock().unwrap();
+    Ok(browser.get_state())
+}
+
+#[tauri::command]
+fn execute_browser_action(action: BrowserActionRequest, state: State<'_, AppState>) -> Result<BrowserActionResult, String> {
+    let browser = state.browser.lock().unwrap();
     browser.execute_action(&action)
 }
 
@@ -359,14 +432,23 @@ fn get_provider_readiness(state: State<'_, AppState>) -> Result<ProviderHealthRe
 
 pub fn run() {
     tauri::Builder::default()
-        .manage(AppState {
-            workspace_root: Mutex::new(None),
-            provider_config: Mutex::new(None),
-            provider_api_key: Mutex::new(None),
+        .setup(|app| {
+            let config_dir = app.path_resolver().app_config_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+            let global_config = GlobalConfigService::new(config_dir);
+            
+            app.manage(AppState {
+                workspace_root: Mutex::new(None),
+                provider_config: Mutex::new(None),
+                provider_api_key: Mutex::new(None),
+                browser: Mutex::new(LocalBrowserService::new()),
+                global_config: Mutex::new(global_config),
+            });
+            Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             check_health,
             open_workspace,
+            get_app_boot_data,
             get_workspace_summary,
             list_workspace_entries,
             read_workspace_file,
@@ -390,7 +472,10 @@ pub fn run() {
             check_provider_health,
             list_provider_models,
             test_generation,
-            get_provider_readiness
+            get_provider_readiness,
+            browser_launch_session,
+            browser_close_session,
+            browser_get_session_state
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

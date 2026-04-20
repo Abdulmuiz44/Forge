@@ -29,9 +29,42 @@ impl JournalService {
     }
 }
 
+pub struct ExecutionPersistenceService {
+    root_path: PathBuf,
+}
+
+impl ExecutionPersistenceService {
+    pub fn new(workspace_root: &str) -> Self {
+        let dir = PathBuf::from(workspace_root).join(".forge").join("executions");
+        let _ = fs::create_dir_all(&dir);
+        Self { root_path: dir }
+    }
+
+    pub fn save_state(&self, state: &ExecutionState) -> Result<(), String> {
+        let file_path = self.root_path.join("state.json");
+        let data = serde_json::to_string_pretty(state).map_err(|e| e.to_string())?;
+        fs::write(file_path, data).map_err(|e| e.to_string())
+    }
+
+    pub fn load_state(&self) -> Result<ExecutionState, String> {
+        let file_path = self.root_path.join("state.json");
+        let data = fs::read_to_string(file_path).map_err(|e| e.to_string())?;
+        serde_json::from_str(&data).map_err(|e| e.to_string())
+    }
+
+    pub fn clear(&self) -> Result<(), String> {
+        let file_path = self.root_path.join("state.json");
+        if file_path.exists() {
+            fs::remove_file(file_path).map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+}
+
 pub struct ExecutionOrchestrator<'a> {
     workspace_root: String,
     journal: JournalService,
+    persistence: ExecutionPersistenceService,
     provider: &'a dyn ExecutionProvider,
 }
 
@@ -40,6 +73,7 @@ impl<'a> ExecutionOrchestrator<'a> {
         Self {
             workspace_root: workspace_root.to_string(),
             journal: JournalService::new(workspace_root),
+            persistence: ExecutionPersistenceService::new(workspace_root),
             provider,
         }
     }
@@ -61,6 +95,8 @@ impl<'a> ExecutionOrchestrator<'a> {
             mode: ExecutionMode::StepByStep,
             current_step_id: first_step,
         };
+
+        self.persistence.save_state(&state)?;
 
         Ok(state)
     }
@@ -99,7 +135,7 @@ impl<'a> ExecutionOrchestrator<'a> {
         })?;
 
         let mut patch = None;
-        let mut status = StepExecutionStatus::Completed;
+        let mut status = StepExecutionStatus::Applied;
 
         if intent.kind == ActionKind::ProposeEdit || intent.kind == ActionKind::ApplyEdit {
             status = StepExecutionStatus::AwaitingPatchReview;
@@ -146,6 +182,7 @@ impl<'a> ExecutionOrchestrator<'a> {
         }
 
         state.status = ExecutionStatus::Ready;
+        self.persistence.save_state(state)?;
         Ok(())
     }
 }

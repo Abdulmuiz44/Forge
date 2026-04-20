@@ -1,41 +1,46 @@
-use forge_protocol::{BrowserActionRequest, BrowserActionResult};
+pub mod managed;
+
+use forge_protocol::*;
+pub use managed::BrowserSession;
+use std::path::PathBuf;
 
 pub struct LocalBrowserService {
-    _session_active: bool,
+    session: Option<BrowserSession>,
 }
 
 impl LocalBrowserService {
     pub fn new() -> Self {
-        Self { _session_active: false }
+        Self { session: None }
     }
 
-    pub fn attach_session(&mut self) -> Result<(), String> {
-        self._session_active = true;
+    pub fn launch(&mut self, workspace_root: PathBuf) -> Result<(), String> {
+        let session = BrowserSession::launch(workspace_root)?;
+        self.session = Some(session);
+        Ok(())
+    }
+
+    pub fn close(&mut self) -> Result<(), String> {
+        self.session = None;
         Ok(())
     }
 
     pub fn execute_action(&self, request: &BrowserActionRequest) -> Result<BrowserActionResult, String> {
-        // Thin MVP: We map the strict Protocol commands directly to simulated DOM responses
-        match request.action_kind.as_str() {
-            "open_url" => {
-                Ok(BrowserActionResult {
-                    success: true,
-                    message: format!("Navigated to {}", request.value),
-                    screenshot_base64: None,
-                })
-            },
-            "click_selector" => {
-                Ok(BrowserActionResult {
-                    success: true,
-                    message: format!("Clicked element matching '{}'", request.value),
-                    screenshot_base64: None,
-                })
-            },
-            _ => Ok(BrowserActionResult {
-                success: true,
-                message: "Action completed.".to_string(),
-                screenshot_base64: None,
-            })
+        if let Some(ref session) = self.session {
+            session.execute_action(request)
+        } else {
+            Err("No active browser session. Launch a session first.".to_string())
+        }
+    }
+
+    pub fn get_state(&self) -> BrowserSessionState {
+        if let Some(ref session) = self.session {
+            session.get_status()
+        } else {
+            BrowserSessionState {
+                status: BrowserSessionStatus::Disconnected,
+                current_target: None,
+                last_error: None,
+            }
         }
     }
 }

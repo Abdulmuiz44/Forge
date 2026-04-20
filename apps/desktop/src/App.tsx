@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { Button } from '@forge/ui';
 import { Play, Folder, Terminal, Settings, Layout, Search, GitBranch, FileText, CheckCircle, ShieldAlert, Check, X, Code, ListTodo, Map, Activity, FileDiff, RefreshCw, AlertTriangle, Rocket, Wrench, Globe, ArrowRight, Cpu, Wifi, WifiOff, Zap, Server } from 'lucide-react';
-import { WorkspaceSummary, FileEntry, GitStatusSummary, FileReadResult, ExecutionPlan, TaskRequest, PlanStatus, ExecutionState, StepExecutionRecord, PatchProposal, VerificationState, RetryRequest, RepairAttempt, DeployPrepSummary, BrowserActionRequest, BrowserActionResult, ProviderConfig, ProviderHealthResult, ProviderKind, ModelDescriptor, GenerationResponse } from '@forge/shared';
+import { WorkspaceSummary, FileEntry, GitStatusSummary, FileReadResult, ExecutionPlan, TaskRequest, PlanStatus, ExecutionState, StepExecutionRecord, PatchProposal, VerificationState, RetryRequest, RepairAttempt, DeployPrepSummary, BrowserActionRequest, BrowserActionResult, BrowserActionKind, BrowserArtifactKind, BrowserSessionStatus, BrowserSessionState, BrowserArtifact, ProviderConfig, ProviderHealthResult, ProviderKind, ModelDescriptor, GenerationResponse, AppBootData, PlanStepStatus, StepExecutionStatus, PatchProposalStatus, VerificationStatus, RepairAttemptStatus, ProviderStatus } from '@forge/shared';
 
 function App() {
   const [workspace, setWorkspace] = useState<WorkspaceSummary | null>(null);
@@ -20,10 +20,11 @@ function App() {
   const [retryReq, setRetryReq] = useState<RetryRequest | null>(null);
   const [repairState, setRepairState] = useState<RepairAttempt | null>(null);
   const [deployState, setDeployState] = useState<DeployPrepSummary | null>(null);
-  const [journal, setJournal] = useState<string[]>([]);
+  const [lastScreenshot, setLastScreenshot] = useState<string | null>(null);
+  const [timeline, setTimeline] = useState<{ timestamp: string, message: string, source: 'system' | 'browser' | 'verifier' }[]>([]);
   const journalEndRef = useRef<HTMLDivElement>(null);
   const [browserAction, setBrowserAction] = useState("");
-  const [browserLog, setBrowserLog] = useState<string[]>([]);
+  const [browserSession, setBrowserSession] = useState<BrowserSessionState | null>(null);
 
   // Provider state
   const [providerConfig, setProviderConfig] = useState<ProviderConfig | null>(null);
@@ -33,14 +34,50 @@ function App() {
   const [settingsForm, setSettingsForm] = useState({ kind: 'ollama' as ProviderKind, baseUrl: 'http://localhost:11434', modelId: 'llama3.2', apiKey: '' });
   const [testPrompt, setTestPrompt] = useState("");
   const [testResponse, setTestResponse] = useState("");
+  const [notification, setNotification] = useState<{ message: string, type: 'error' | 'success' | 'info', visible: boolean }>({ message: '', type: 'info', visible: false });
 
-  useEffect(() => { journalEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [journal]);
+  const notify = (message: string, type: 'error' | 'success' | 'info' = 'info') => {
+    setNotification({ message, type, visible: true });
+    if (type !== 'error') {
+      setTimeout(() => setNotification(prev => ({ ...prev, visible: false })), 5000);
+    }
+  };
+
+  useEffect(() => { journalEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [timeline]);
 
   useEffect(() => {
-    invoke<ProviderConfig>("get_provider_config").then(cfg => {
-      setProviderConfig(cfg);
-      setSettingsForm({ kind: cfg.kind, baseUrl: cfg.baseUrl, modelId: cfg.modelId, apiKey: '' });
-    }).catch(() => {});
+    // App Boot Recovery
+    invoke<AppBootData>("get_app_boot_data").then(boot => {
+      if (boot.lastWorkspace) {
+        setWorkspace(boot.lastWorkspace);
+        setWsInputPath(boot.lastWorkspace.rootPath);
+        // Refresh entries
+        invoke<FileEntry[]>("list_workspace_entries", { relativePath: null }).then(setEntries).catch(() => {});
+        invoke<GitStatusSummary>("get_git_status").then(setGitStatus).catch(() => {});
+      }
+      if (boot.providerConfig) {
+        setProviderConfig(boot.providerConfig);
+        setSettingsForm({ kind: boot.providerConfig.kind, baseUrl: boot.providerConfig.baseUrl, modelId: boot.providerConfig.modelId, apiKey: '' });
+      }
+      if (boot.activePlan) {
+        setActivePlan(boot.activePlan);
+        if (boot.activeExecution) {
+          setExecState(boot.activeExecution);
+          setViewMode('executor');
+        } else {
+          setViewMode('plan');
+        }
+      }
+      // Probe health
+      invoke<ProviderHealthResult>("check_provider_health").then(setProviderHealth).catch(() => {});
+    }).catch(e => {
+       console.error("Boot error", e);
+       // Fallback
+       invoke<ProviderConfig>("get_provider_config").then(cfg => {
+         setProviderConfig(cfg);
+         setSettingsForm({ kind: cfg.kind, baseUrl: cfg.baseUrl, modelId: cfg.modelId, apiKey: '' });
+       }).catch(() => {});
+    });
   }, []);
 
   const openWorkspace = async () => {
@@ -61,7 +98,7 @@ function App() {
         const health = await invoke<ProviderHealthResult>("check_provider_health");
         setProviderHealth(health);
       } catch {}
-    } catch (e) { alert(`Failed: ${e}`); }
+    } catch (e) { notify(`Failed to open workspace: ${e}`, 'error'); }
   };
 
   const openFile = async (path: string) => {
@@ -69,7 +106,7 @@ function App() {
       const result = await invoke<FileReadResult>("read_workspace_file", { path });
       setActiveFile({ path, content: result.content });
       setViewMode('editor');
-    } catch (e) { alert(`Read failed: ${e}`); }
+    } catch (e) { notify(`Read failed: ${e}`, 'error'); }
   };
 
   const submitTask = async () => {
@@ -77,85 +114,145 @@ function App() {
     setIsPlanning(true); setViewMode('plan');
     try {
       const req: TaskRequest = { id: crypto.randomUUID(), intent: taskIntent, mode: 'auto' };
-      setJournal(prev => [...prev, `[System] Planning with ${providerHealth?.reachable ? 'live' : 'mock'} provider (${providerConfig?.kind ?? 'none'} / ${providerConfig?.modelId ?? 'echo'})`]);
+      setTimeline(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), message: `Planning task: ${taskIntent}`, source: 'system' }]);
       const plan = await invoke<ExecutionPlan>("submit_task_for_planning", { request: req });
       const reviewPlan = await invoke<ExecutionPlan>("update_plan_status", { planId: plan.id, status: 'ready_for_review' });
       setActivePlan(reviewPlan);
-    } catch (e) { alert(`Planning failed: ${e}`); }
+    } catch (e) { notify(`Planning failed: ${e}`, 'error'); }
     finally { setIsPlanning(false); setTaskIntent(""); }
   };
 
   const setPlanApproval = async (status: PlanStatus) => {
     if (!activePlan) return;
-    try { const updatedPlan = await invoke<ExecutionPlan>("update_plan_status", { planId: activePlan.id, status }); setActivePlan(updatedPlan); } catch (e) { alert(`Update failed: ${e}`); }
+    try { const updatedPlan = await invoke<ExecutionPlan>("update_plan_status", { planId: activePlan.id, status }); setActivePlan(updatedPlan);    } catch (e) { notify(`Update failed: ${e}`, 'error'); }
   };
 
   const startExecution = async () => {
     if (!activePlan || activePlan.status !== 'approved') return;
     try {
-      setJournal(["[System] Bootstrapping execution context..."]); setViewMode('executor');
+      setTimeline([{ timestamp: new Date().toLocaleTimeString(), message: "Bootstrapping execution context...", source: 'system' }]); 
+      setViewMode('executor');
       const st = await invoke<ExecutionState>("start_execution", { plan: activePlan });
       setExecState(st); runStep(st, activePlan);
-    } catch (e) { alert(`Execution start error: ${e}`); }
+    } catch (e) { notify(`Execution start error: ${e}`, 'error'); }
   };
 
   const runStep = async (currentState: ExecutionState, plan: ExecutionPlan) => {
     try {
       const rec = await invoke<StepExecutionRecord>("execute_step", { execState: currentState, plan });
-      setJournal(prev => [...prev, ...rec.observations.map(o => `[${o.timestamp}] ${o.message}`)]);
+      setTimeline(prev => [...prev, ...rec.observations.map(o => ({ timestamp: o.timestamp, message: o.message, source: 'system' as const }))]);
       if (rec.status === 'awaiting_patch_review' && rec.pendingPatch) { setActivePatch(rec.pendingPatch); }
-      else if (rec.status === 'completed') { setJournal(prev => [...prev, "[System] Step completed. Ready for Verification."]); }
-    } catch (e) { setJournal(prev => [...prev, `[FATAL] Action failed: ${e}`]); }
+      else if (rec.status === 'applied') { setTimeline(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), message: "Step completed. Ready for Verification.", source: 'system' }]); }
+    } catch (e) { setTimeline(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), message: `Action failed: ${e}`, source: 'system' }]); }
   };
 
   const handlePatchDecision = async (approved: boolean) => {
     if (!execState || !activePatch) return;
     try {
       const updatedSt = await invoke<ExecutionState>("submit_patch_decision", { execState, patchId: activePatch.id, approved });
-      setJournal(prev => [...prev, `[System] Patch ${approved ? 'approved & applied' : 'rejected'}`]);
+      setTimeline(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), message: `Patch ${approved ? 'approved & applied' : 'rejected'}`, source: 'system' }]);
       setActivePatch(null); setExecState(updatedSt);
-      if (approved && !repairState) { setJournal(prev => [...prev, `[System] Step applied. Verifier handover available.`]); }
-    } catch(e) { setJournal(prev => [...prev, `[Error] ${e}`]); }
+      if (approved && !repairState) { 
+        setTimeline(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), message: "Step applied. Verifier handover available.", source: 'system' }]);
+      }
+    } catch(e) { 
+      setTimeline(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), message: `Error: ${e}`, source: 'system' }]);
+    }
   };
 
   const startVerification = async () => {
     if (!execState || !execState.currentStepId) return;
     try {
-      setJournal(prev => [...prev, "[Verifier] Running checks..."]); setViewMode('verifier');
+      setTimeline(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), message: "Running verification checks...", source: 'verifier' }]);
+      setViewMode('verifier');
       const ver = await invoke<VerificationState>("start_verification", { executionId: execState.id, stepId: execState.currentStepId });
       setVerState(ver);
       if (ver.status === 'failed') {
         const proposal = await invoke<RetryRequest>("generate_retry_proposal", { verificationState: ver });
-        setRetryReq(proposal); setJournal(prev => [...prev, `[Verifier] Tests failed. Retry available.`]);
-      } else { setJournal(prev => [...prev, `[Verifier] All checks passed.`]); }
-    } catch (e) { alert(`Verification Error: ${e}`); }
+        setRetryReq(proposal); 
+        setTimeline(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), message: "Tests failed. Technical debt identified.", source: 'verifier' }]);
+      } else { 
+        setTimeline(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), message: "All checks passed successfully.", source: 'verifier' }]); 
+      }
+    } catch (e) { notify(`Verification Error: ${e}`, 'error'); }
   };
 
   const loadRepairState = async () => {
     if (!retryReq) return;
     try {
-      setJournal(prev => [...prev, `[Repair] Generating fix...`]); setViewMode('executor');
+      setTimeline(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), message: "Generating repair plan with AI context...", source: 'system' }]);
+      setViewMode('executor');
       const attempt = await invoke<RepairAttempt>("start_repair_attempt", { retryRequest: retryReq });
       setRepairState(attempt);
       if (attempt.proposedPatch) { setActivePatch(attempt.proposedPatch); }
-    } catch (e) { alert(`Repair Init Error: ${e}`); }
+    } catch (e) { notify(`Repair Init Error: ${e}`, 'error'); }
   };
 
   const prepareDeployment = async () => {
     try {
-      setJournal(prev => [...prev, "[Deploy] Evaluating workspace..."]); setViewMode('deploy');
+      setTimeline(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), message: "Evaluating workspace for deployment readiness...", source: 'system' }]);
+      setViewMode('deploy');
       const deployReq = await invoke<DeployPrepSummary>("prepare_deployment");
       setDeployState(deployReq);
-    } catch (e) { alert(`Deploy Error: ${e}`); }
+    } catch (e) { notify(`Deploy Error: ${e}`, 'error'); }
   };
 
-  const triggerBrowserAction = async () => {
+  const triggerBrowserAction = async (kind: BrowserActionKind = 'open_url', overrideValue?: string) => {
     try {
       setViewMode('browser');
-      const req: BrowserActionRequest = { actionKind: 'open_url', value: browserAction || 'https://localhost:3000' };
+      const actionId = crypto.randomUUID();
+      const val = overrideValue || browserAction || 'https://google.com';
+      const req: BrowserActionRequest = { 
+        id: actionId,
+        kind, 
+        value: val 
+      };
+      
+      setTimeline(prev => [...prev, { 
+        timestamp: new Date().toLocaleTimeString(), 
+        message: `Browser Action dispatched: ${kind} (${val})`, 
+        source: 'browser' 
+      }]);
       const result = await invoke<BrowserActionResult>("execute_browser_action", { action: req });
-      setBrowserLog(prev => [...prev, `[DOM] ${req.actionKind} -> ${result.message}`]); setBrowserAction("");
-    } catch (e) { alert(`Browser failed: ${e}`); }
+      
+      if (result.success) {
+        setTimeline(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), message: `OK: ${result.message}`, source: 'browser' }]);
+        if (result.screenshotBase64) {
+          setLastScreenshot(result.screenshotBase64);
+        }
+      } else {
+        setTimeline(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), message: `ERROR: ${result.message}`, source: 'browser' }]);
+      }
+      
+      setBrowserAction("");
+      // Update state after action
+      await syncBrowserState();
+    } catch (e) { notify(`Browser error: ${e}`, 'error'); }
+  };
+
+  const launchBrowserSession = async () => {
+    try {
+      setTimeline(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), message: "Launching browser session...", source: 'browser' }]);
+      const state = await invoke<BrowserSessionState>("browser_launch_session");
+      setBrowserSession(state);
+      setTimeline(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), message: "Browser ready.", source: 'browser' }]);
+    } catch (e) { notify(`Launch failed: ${e}`, 'error'); }
+  };
+
+  const closeBrowserSession = async () => {
+    try {
+      const state = await invoke<BrowserSessionState>("browser_close_session");
+      setBrowserSession(state);
+      setLastScreenshot(null);
+      setTimeline(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), message: "Browser session closed.", source: 'browser' }]);
+    } catch (e) { notify(`Close failed: ${e}`, 'error'); }
+  };
+
+  const syncBrowserState = async () => {
+    try {
+      const state = await invoke<BrowserSessionState>("browser_get_session_state");
+      setBrowserSession(state);
+    } catch {}
   };
 
   // ---- Provider Settings ----
@@ -168,7 +265,7 @@ function App() {
       setProviderConfig(cfg);
       setSettingsForm(prev => ({ ...prev, apiKey: '' }));
       runHealthCheck();
-    } catch (e) { alert(`Save failed: ${e}`); }
+    } catch (e) { notify(`Save configuration failed: ${e}`, 'error'); }
   };
 
   const runHealthCheck = async () => {
@@ -203,8 +300,10 @@ function App() {
   };
 
   const providerBadge = providerHealth?.reachable
-    ? <span className="flex items-center text-[10px] font-bold text-green-500 bg-green-900/20 px-2 py-1 rounded-full border border-green-900/30"><Wifi className="w-3 h-3 mr-1"/>{providerConfig?.modelId}</span>
-    : <span className="flex items-center text-[10px] font-bold text-neutral-500 bg-neutral-900 px-2 py-1 rounded-full border border-neutral-800"><WifiOff className="w-3 h-3 mr-1"/>No Model</span>;
+    ? (providerHealth.modelAvailable 
+        ? <span className="flex items-center text-[10px] font-bold text-green-500 bg-green-900/20 px-2 py-1 rounded-full border border-green-900/30 shadow-[0_0_10px_rgba(34,197,94,0.1)] transition-all hover:scale-105 cursor-default"><Zap className="w-3 h-3 mr-1"/>{providerConfig?.modelId}</span>
+        : <span className="flex items-center text-[10px] font-bold text-yellow-500 bg-yellow-900/20 px-2 py-1 rounded-full border border-yellow-900/30"><AlertTriangle className="w-3 h-3 mr-1"/>No Model</span>)
+    : <span className="flex items-center text-[10px] font-bold text-red-500 bg-red-900/20 px-2 py-1 rounded-full border border-red-900/30 animate-pulse"><WifiOff className="w-3 h-3 mr-1"/>Disconnected</span>;
 
   return (
     <div className="flex h-screen w-full flex-col bg-neutral-950 text-neutral-50 overflow-hidden text-sm">
@@ -213,6 +312,23 @@ function App() {
           <Zap className="w-4 h-4 text-blue-500" />
           <span className="text-white">Forge</span> <span className="text-neutral-500 font-normal">Desktop</span>
         </div>
+
+        {/* Global Notification Banner */}
+        {notification.visible && (
+          <div className={`absolute top-14 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-2xl border shadow-2xl backdrop-blur-xl flex items-center animate-in slide-in-from-top-4 duration-300 ${
+            notification.type === 'error' ? 'bg-red-950/40 border-red-900/50 text-red-200' :
+            notification.type === 'success' ? 'bg-green-950/40 border-green-900/50 text-green-200' :
+            'bg-blue-950/40 border-blue-900/50 text-blue-200'
+          }`}>
+            {notification.type === 'error' ? <AlertTriangle className="w-4 h-4 mr-3 text-red-400"/> :
+             notification.type === 'success' ? <CheckCircle className="w-4 h-4 mr-3 text-green-400"/> :
+             <Activity className="w-4 h-4 mr-3 text-blue-400"/>}
+            <span className="text-sm font-medium mr-6">{notification.message}</span>
+            <button onClick={() => setNotification(prev => ({ ...prev, visible: false }))} className="hover:text-white transition-colors">
+              <X className="w-4 h-4"/>
+            </button>
+          </div>
+        )}
         <div className="flex items-center space-x-3">
           {providerBadge}
           {!workspace ? (
@@ -366,19 +482,97 @@ function App() {
             </div>
 
           ) : viewMode === 'browser' ? (
-            <div className="flex-1 flex flex-col pt-10 max-w-4xl mx-auto w-full px-8">
-              <h2 className="text-2xl font-semibold mb-6 flex items-center"><Globe className="w-6 h-6 mr-3 text-blue-400"/> Browser Runtime</h2>
-              <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 flex flex-col h-[500px]">
-                <div className="flex space-x-2 border-b border-neutral-800 pb-4 mb-4 items-center">
-                  <input className="flex-1 bg-black text-xs font-mono text-neutral-300 px-4 py-2 rounded outline-none border border-neutral-800 focus:border-blue-500"
-                    placeholder="Action trigger..." value={browserAction} onChange={e => setBrowserAction(e.target.value)} onKeyDown={e => e.key === 'Enter' && triggerBrowserAction()} />
-                  <Button onClick={triggerBrowserAction} className="bg-blue-600 hover:bg-blue-700"><ArrowRight className="w-4 h-4" /></Button>
+            <div className="flex-1 flex flex-col pt-6 max-w-5xl mx-auto w-full px-8 pb-10">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-semibold flex items-center"><Globe className="w-6 h-6 mr-3 text-blue-400"/> Browser Runtime</h2>
+                <div className="flex items-center space-x-3">
+                  {browserSession?.status === 'ready' || browserSession?.status === 'busy' || browserSession?.status === 'navigating' ? (
+                    <Button variant="outline" className="text-red-400 border-red-900/30 hover:bg-red-950/20" onClick={closeBrowserSession}><X className="w-4 h-4 mr-2"/> Stop Session</Button>
+                  ) : (
+                    <Button className="bg-blue-600 hover:bg-blue-700 font-bold" onClick={launchBrowserSession} disabled={!workspace}><Play className="w-4 h-4 mr-2"/> Launch Browser</Button>
+                  )}
+                  <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                    browserSession?.status === 'ready' ? 'bg-green-950/20 border-green-900/30 text-green-400' :
+                    browserSession?.status === 'disconnected' ? 'bg-neutral-900 border-neutral-800 text-neutral-500' :
+                    'bg-blue-950/20 border-blue-900/30 text-blue-400 animate-pulse'
+                  }`}>
+                    {browserSession?.status ?? 'disconnected'}
+                  </div>
                 </div>
-                <div className="bg-black/50 border border-neutral-800 flex-1 rounded flex items-center justify-center relative overflow-hidden">
-                  <span className="text-neutral-600 absolute">Visual Layout Placeholder</span>
-                  <div className="absolute inset-x-0 bottom-0 bg-neutral-900/90 border-t border-neutral-800 h-1/3 p-4 flex flex-col">
-                    <div className="text-[10px] font-bold text-neutral-500 uppercase flex items-center mb-2"><Code className="w-3 h-3 mr-1"/> CDP Traces</div>
-                    <div className="flex-1 overflow-y-auto text-xs font-mono text-green-500 space-y-1">{browserLog.map((log, i) => <div key={i}>{log}</div>)}</div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-6">
+                {/* Toolbar */}
+                <div className="bg-neutral-900 border border-neutral-800 p-2 rounded-xl flex items-center space-x-2 shadow-2xl">
+                  <div className="flex-1 flex items-center bg-black rounded-lg border border-neutral-800 px-4 py-2 focus-within:border-blue-500 transition-colors">
+                    <Globe className="w-4 h-4 text-neutral-600 mr-3" />
+                    <input 
+                      className="flex-1 bg-transparent text-sm text-neutral-200 outline-none font-mono"
+                      placeholder="Enter URL to navigate..." 
+                      value={browserAction} 
+                      onChange={e => setBrowserAction(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && triggerBrowserAction('open_url')}
+                    />
+                  </div>
+                  <Button onClick={() => triggerBrowserAction('open_url')} className="bg-blue-600 h-10 w-20 justify-center" disabled={!browserSession || browserSession.status === 'disconnected'}>
+                    Go
+                  </Button>
+                  <div className="h-6 w-px bg-neutral-800 mx-2" />
+                  <Button variant="outline" className="h-10 px-3" onClick={() => triggerBrowserAction('capture_screenshot')} disabled={!browserSession || browserSession.status === 'disconnected'}>
+                    <Code className="w-4 h-4" />
+                  </Button>
+                </div>
+
+                {/* Main View */}
+                <div className="grid grid-cols-[1fr_300px] gap-6 h-[500px]">
+                  <div className="bg-black border border-neutral-800 rounded-2xl overflow-hidden relative group">
+                    {lastScreenshot ? (
+                      <img src={`data:image/png;base64,${lastScreenshot}`} className="w-full h-full object-contain" alt="Browser Viewport" />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center text-neutral-700 bg-[radial-gradient(#111_1px,transparent_0)] [background-size:20px_20px]">
+                        <Zap className="w-12 h-12 mb-4 opacity-20" />
+                        <p className="text-sm font-medium opacity-40">No viewport data available</p>
+                        <p className="text-xs opacity-30 mt-2">Launch a session and navigate to a URL to see content</p>
+                      </div>
+                    )}
+                    
+                    {browserSession?.currentTarget && (
+                      <div className="absolute top-4 left-4 right-4 bg-black/80 backdrop-blur-md border border-neutral-800 p-3 rounded-lg flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center overflow-hidden mr-4">
+                          <Layout className="w-4 h-4 text-blue-500 mr-3 shrink-0" />
+                          <div className="truncate">
+                            <p className="text-[10px] font-bold text-neutral-500 uppercase leading-none mb-1">Current Page</p>
+                            <p className="text-xs text-neutral-300 truncate font-medium">{browserSession.currentTarget.title || 'Untitled'}</p>
+                          </div>
+                        </div>
+                        <div className="text-[10px] font-mono text-neutral-500 bg-neutral-900 px-2 py-1 rounded truncate max-w-[200px]">
+                          {browserSession.currentTarget.url}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Sidebar Log */}
+                  <div className="bg-neutral-900 border border-neutral-800 rounded-2xl flex flex-col overflow-hidden shadow-xl">
+                    <div className="px-4 py-3 border-b border-neutral-800 bg-black/20 flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest flex items-center"><Terminal className="w-3 h-3 mr-2"/> Action Log</span>
+                      <Button variant="ghost" className="h-6 w-6 p-0 text-neutral-600" onClick={() => setTimeline(prev => prev.filter(t => t.source !== 'browser'))}><RefreshCw className="w-3 h-3"/></Button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3 font-mono text-[11px] leading-relaxed">
+                      {timeline.filter(t => t.source === 'browser').length === 0 ? (
+                        <div className="h-full flex items-center justify-center text-neutral-700 italic">No events yet</div>
+                      ) : (
+                        timeline.filter(t => t.source === 'browser').map((item, i) => (
+                          <div key={i} className={`pb-2 border-b border-neutral-800/50 ${
+                            item.message.includes('ERROR') ? 'text-red-400' : 
+                            item.message.includes('OK') ? 'text-green-400' : 
+                            item.message.includes('[System]') ? 'text-blue-400' : 'text-neutral-500'
+                          }`}>
+                            {item.message}
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -479,9 +673,22 @@ function App() {
                 </div>
               )}
               <div className="h-64 border-t border-neutral-900 bg-[#0a0a0a] flex flex-col shrink-0 mt-8">
-                <div className="flex h-8 items-center bg-neutral-900 border-b border-neutral-800 px-4 text-[10px] font-bold uppercase tracking-widest text-neutral-600">Operation Log</div>
-                <div className="p-4 flex-1 overflow-y-auto font-mono text-[11px] whitespace-pre-wrap text-blue-300/80 leading-relaxed">
-                  {journal.map((line, i) => <div key={i} className="mb-1">{line}</div>)}
+                <div className="flex h-8 items-center bg-neutral-900 border-b border-neutral-800 px-4 text-[10px] font-bold uppercase tracking-widest text-neutral-600 justify-between">
+                  <div className="flex items-center"><Activity className="w-3 h-3 mr-2 text-blue-500"/> Activity Timeline</div>
+                  <button onClick={() => setTimeline([])} className="hover:text-neutral-300 transition-colors">Clear</button>
+                </div>
+                <div className="p-4 flex-1 overflow-y-auto font-mono text-[11px] leading-relaxed">
+                  {timeline.map((item, i) => (
+                    <div key={i} className="mb-1.5 flex gap-3">
+                      <span className="text-neutral-700 shrink-0">{item.timestamp}</span>
+                      <span className={`shrink-0 px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold uppercase tracking-tighter ${
+                        item.source === 'browser' ? 'bg-purple-900/30 text-purple-400 border border-purple-800/50' : 
+                        item.source === 'verifier' ? 'bg-orange-900/30 text-orange-400 border border-orange-800/50' : 
+                        'bg-blue-900/30 text-blue-400 border border-blue-800/50'
+                      }`}>{item.source}</span>
+                      <span className="text-neutral-300">{item.message}</span>
+                    </div>
+                  ))}
                   <div ref={journalEndRef} />
                 </div>
               </div>
@@ -513,6 +720,56 @@ function App() {
 
           ) : viewMode === 'editor' && activeFile ? (
             <textarea className="flex-1 w-full p-6 bg-transparent resize-none outline-none font-mono text-[13px] leading-loose text-neutral-300" value={activeFile.content} readOnly />
+          ) : !workspace ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-12 bg-gradient-to-b from-transparent to-blue-900/5">
+              <div className="max-w-xl w-full text-center space-y-8 animate-in fade-in zoom-in duration-700">
+                <div className="relative inline-block">
+                  <div className="absolute -inset-4 bg-blue-500/20 blur-2xl rounded-full animate-pulse" />
+                  <Rocket className="w-20 h-20 mx-auto text-blue-500 relative" />
+                </div>
+                <div>
+                  <h1 className="text-5xl font-bold tracking-tighter text-white mb-4 italic">FORGE</h1>
+                  <p className="text-neutral-400 text-lg leading-relaxed">Local-first, native AI software engineering agent. Deep workspace integration without cloud boundaries.</p>
+                </div>
+                
+                <div className="bg-neutral-900/50 backdrop-blur border border-neutral-800 rounded-2xl p-8 space-y-6 shadow-2xl">
+                   <div className="flex flex-col space-y-3">
+                     <label className="text-xs font-bold uppercase tracking-widest text-neutral-500 text-left">Connect Workspace</label>
+                     <div className="flex gap-2">
+                       <input 
+                         className="flex-1 bg-black/50 border border-neutral-800 rounded-xl px-4 py-3 text-sm text-neutral-200 outline-none focus:border-blue-500 font-mono"
+                         placeholder="C:\Users\Name\Projects\..."
+                         value={wsInputPath}
+                         onChange={e => setWsInputPath(e.target.value)}
+                       />
+                       <Button onClick={openWorkspace} className="px-6 font-bold bg-blue-600 hover:bg-blue-500" disabled={!wsInputPath}>Initialize</Button>
+                     </div>
+                   </div>
+
+                   <div className="border-t border-neutral-800 pt-6">
+                     <label className="text-xs font-bold uppercase tracking-widest text-neutral-500 text-left block mb-4">Quick Start Demo Path</label>
+                     <div className="grid grid-cols-1 gap-2 text-left">
+                       {[
+                         { title: "Refactor existing logic", icon: <Code className="w-3.5 h-3.5 mr-2"/> },
+                         { title: "Fix identified security bugs", icon: <ShieldAlert className="w-3.5 h-3.5 mr-2"/> },
+                         { title: "Optimize build performance", icon: <Zap className="w-3.5 h-3.5 mr-2"/> }
+                       ].map((item, i) => (
+                         <button key={i} onClick={() => setTaskIntent(item.title)} className="flex items-center p-3 rounded-lg bg-neutral-950 border border-neutral-900 hover:border-blue-500/50 hover:bg-blue-950/10 text-neutral-400 hover:text-blue-300 transition-all text-sm group">
+                           {item.icon} {item.title}
+                           <ArrowRight className="w-3.5 h-3.5 ml-auto opacity-0 group-hover:opacity-100 transition-opacity"/>
+                         </button>
+                       ))}
+                     </div>
+                   </div>
+                </div>
+
+                <div className="flex items-center justify-center gap-8 pt-8 opacity-40">
+                  <div className="flex items-center text-xs font-mono text-neutral-400"><Cpu className="w-4 h-4 mr-2"/> Local Models</div>
+                  <div className="flex items-center text-xs font-mono text-neutral-400"><ShieldAlert className="w-4 h-4 mr-2"/> Private Loop</div>
+                  <div className="flex items-center text-xs font-mono text-neutral-400"><Activity className="w-4 h-4 mr-2"/> Deterministic</div>
+                </div>
+              </div>
+            </div>
           ) : (
             <div className="flex-1 flex items-center justify-center p-6 text-neutral-500">
               <div className="text-center opacity-50">

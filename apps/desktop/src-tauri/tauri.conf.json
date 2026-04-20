@@ -11,7 +11,7 @@
   "app": {
     "windows": [
       {
-        "title": "Forge Native",
+        "title": "Forge",
         "width": 1200,
         "height": 800,
         "decorations": true,

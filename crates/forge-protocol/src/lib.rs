@@ -268,7 +268,101 @@ pub enum DeployTargetKind { NodeWebApp, StaticSite, TauriDesktop, RustService, U
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum BrowserSessionStatus { Disconnected, Attached, Running }
+pub enum BrowserSessionStatus {
+    Idle,
+    Launching,
+    Connecting,
+    Ready,
+    Navigating,
+    Busy,
+    Disconnected,
+    Failed,
+    Closed,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum BrowserActionKind {
+    OpenUrl,
+    ClickSelector,
+    TypeSelector,
+    WaitForSelector,
+    ExtractText,
+    CaptureScreenshot,
+    GetPageState,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum BrowserArtifactKind {
+    Screenshot,
+    PageSnapshot,
+    EventLog,
+    ExtractedText,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserTargetInfo {
+    pub url: String,
+    pub title: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserPageState {
+    pub url: String,
+    pub title: String,
+    pub can_go_back: bool,
+    pub can_go_forward: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserActionRequest {
+    pub id: String,
+    pub kind: BrowserActionKind,
+    pub value: String, // Dynamic target (URL, Selector, etc.)
+    pub text_input: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserActionResult {
+    pub action_id: String,
+    pub success: bool,
+    pub message: String,
+    pub artifact_path: Option<String>,
+    pub screenshot_base64: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserEventLogEntry {
+    pub timestamp: String,
+    pub action_id: String,
+    pub kind: BrowserActionKind,
+    pub success: bool,
+    pub message: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserArtifact {
+    pub id: String,
+    pub kind: BrowserArtifactKind,
+    pub path: String,
+    pub timestamp: String,
+    pub metadata: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserSessionState {
+    pub status: BrowserSessionStatus,
+    pub current_target: Option<BrowserTargetInfo>,
+    pub last_error: Option<String>,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -291,20 +385,6 @@ pub struct DeployPrepSummary {
     pub risks: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct BrowserActionRequest {
-    pub action_kind: String,
-    pub value: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct BrowserActionResult {
-    pub success: bool,
-    pub message: String,
-    pub screenshot_base64: Option<String>,
-}
 
 // --- PROVIDER DOMAIN TYPES ---
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -369,4 +449,12 @@ pub struct TokenUsage {
     pub prompt_tokens: i64,
     pub completion_tokens: i64,
     pub total_tokens: i64,
+}
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AppBootData {
+    pub last_workspace: Option<WorkspaceSummary>,
+    pub active_plan: Option<ExecutionPlan>,
+    pub active_execution: Option<ExecutionState>,
+    pub provider_config: Option<ProviderConfig>,
 }
