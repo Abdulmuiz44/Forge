@@ -62,7 +62,6 @@ impl ExecutionPersistenceService {
 }
 
 pub struct ExecutionOrchestrator<'a> {
-    workspace_root: String,
     journal: JournalService,
     persistence: ExecutionPersistenceService,
     provider: &'a dyn ExecutionProvider,
@@ -71,7 +70,6 @@ pub struct ExecutionOrchestrator<'a> {
 impl<'a> ExecutionOrchestrator<'a> {
     pub fn new(workspace_root: &str, provider: &'a dyn ExecutionProvider) -> Self {
         Self {
-            workspace_root: workspace_root.to_string(),
             journal: JournalService::new(workspace_root),
             persistence: ExecutionPersistenceService::new(workspace_root),
             provider,

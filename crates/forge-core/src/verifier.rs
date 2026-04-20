@@ -1,6 +1,6 @@
 use forge_protocol::{
     VerificationState, VerificationStatus, VerificationCheck, VerificationCheckKind,
-    VerificationFinding, FailureClassification, VerificationSeverity, RetryRecommendation, RetryRequest
+    RetryRecommendation, RetryRequest
 };
 use crate::provider::VerificationProvider;
 use std::path::PathBuf;
@@ -26,7 +26,6 @@ impl VerifierPersistence {
 }
 
 pub struct VerificationService<'a> {
-    workspace_root: String,
     persistence: VerifierPersistence,
     provider: &'a dyn VerificationProvider,
 }
@@ -34,7 +33,6 @@ pub struct VerificationService<'a> {
 impl<'a> VerificationService<'a> {
     pub fn new(workspace_root: &str, provider: &'a dyn VerificationProvider) -> Self {
         Self {
-            workspace_root: workspace_root.to_string(),
             persistence: VerifierPersistence::new(workspace_root),
             provider,
         }

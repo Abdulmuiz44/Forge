@@ -1,5 +1,5 @@
 use std::sync::Mutex;
-use tauri::State;
+use tauri::{State, Manager};
 use forge_protocol::*;
 use forge_tools::fs::LocalFileSystem;
 use forge_tools::git::LocalGit;
@@ -14,7 +14,8 @@ use forge_core::provider::{
     create_provider, LiveProvider, EchoMockProvider, IntelligenceProvider,
 };
 use forge_core::provider_config::ProviderConfigService;
-use forge_core::config::{GlobalConfigService, GlobalConfig};
+use forge_core::config::GlobalConfigService;
+
 use forge_browser::LocalBrowserService;
 
 struct AppState {
@@ -28,33 +29,6 @@ struct AppState {
 // --- Centralized provider instantiation ---
 // This is the single source of truth for which provider is active.
 // Every command handler that needs intelligence calls this.
-fn resolve_provider(state: &State<'_, AppState>) -> Box<dyn IntelligenceProvider> {
-    let cfg = state.provider_config.lock().unwrap().clone();
-    let api_key = state.provider_api_key.lock().unwrap().clone();
-
-    match cfg {
-        Some(ref config) => {
-            let provider = create_provider(config, api_key.as_deref());
-            // Quick liveness sanity — if health_check returns unreachable, fall back explicitly
-            match provider.health_check() {
-                Ok(h) if h.reachable => provider,
-                Ok(h) => {
-                    eprintln!("[Forge Provider] Configured provider unreachable: {}. Falling back to mock.", h.message);
-                    Box::new(EchoMockProvider::new())
-                }
-                Err(e) => {
-                    eprintln!("[Forge Provider] Health check error: {}. Falling back to mock.", e);
-                    Box::new(EchoMockProvider::new())
-                }
-            }
-        }
-        None => {
-            eprintln!("[Forge Provider] No provider configured. Using mock mode.");
-            Box::new(EchoMockProvider::new())
-        }
-    }
-}
-
 // Variant that skips health check for speed — used when we know config was recently validated
 fn resolve_provider_fast(state: &State<'_, AppState>) -> Box<dyn IntelligenceProvider> {
     let cfg = state.provider_config.lock().unwrap().clone();
@@ -119,7 +93,6 @@ fn get_app_boot_data(state: State<'_, AppState>) -> Result<AppBootData, String> 
             boot_data.provider_config = state.provider_config.lock().unwrap().clone();
 
             // Check for existing plan/execution
-            let planner = PlannerService::new(&path, &EchoMockProvider::new());
             let plans_dir = std::path::PathBuf::from(&path).join(".forge").join("plans");
             if let Ok(entries) = std::fs::read_dir(plans_dir) {
                 // Find most recent plan
@@ -433,7 +406,7 @@ fn get_provider_readiness(state: State<'_, AppState>) -> Result<ProviderHealthRe
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
-            let config_dir = app.path_resolver().app_config_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+            let config_dir = app.path().app_config_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
             let global_config = GlobalConfigService::new(config_dir);
             
             app.manage(AppState {

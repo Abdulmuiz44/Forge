@@ -3,8 +3,6 @@
     windows_subsystem = "windows"
 )]
 
-pub mod lib;
-
 fn main() {
-    lib::run();
+    desktop::run();
 }

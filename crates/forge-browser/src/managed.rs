@@ -7,7 +7,7 @@ use chrono::Utc;
 use base64::{Engine as _, engine::general_purpose};
 
 pub struct BrowserSession {
-    browser: Browser,
+    _browser: Browser,
     active_tab: Arc<Tab>,
     workspace_root: PathBuf,
 }
@@ -32,7 +32,7 @@ impl BrowserSession {
         }
 
         Ok(Self {
-            browser,
+            _browser: browser,
             active_tab,
             workspace_root,
         })

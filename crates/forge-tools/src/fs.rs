@@ -1,5 +1,5 @@
 use forge_protocol::{FileEntry, FileReadResult, FileWriteRequest, FileWriteResult, CheckpointRecord};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::fs;
 use uuid::Uuid;
 use chrono::Utc;
