@@ -1,4 +1,5 @@
 use headless_chrome::{Browser, LaunchOptions, Tab};
+use std::sync::Arc;
 use forge_protocol::*;
 use std::path::PathBuf;
 use std::fs;

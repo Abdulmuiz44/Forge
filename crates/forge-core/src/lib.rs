@@ -1,4 +1,4 @@
-pub mod architect;
+// pub mod architect;
 pub mod planner;
 pub mod verifier;
 pub mod services;
