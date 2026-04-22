@@ -14,7 +14,13 @@ src-tauri/binaries
 src-tauri/gen/apple
 src-tauri/gen/android
 
-# Forge internal
+# Codra internal
+.codra/plans/*.json
+.codra/executions/*.log
+.codra/verifications/*.json
+.codra/provider_secret.key
+
+# Legacy Forge internal (read-only migration compatibility)
 .forge/plans/*.json
 .forge/executions/*.log
 .forge/verifications/*.json

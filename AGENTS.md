@@ -1,7 +1,7 @@
 # Agents Guidance
 
 ## Repo Purpose
-This Monorepo houses Forge: an open-source, local-first Native AI coding agent equipped with custom routing, testing, and multi-file interaction workflows. 
+This Monorepo houses Codra: an open-source, local-first Native AI coding agent equipped with custom routing, testing, and multi-file interaction workflows. 
 
 ## Canonical Docs to Read First
 1. `docs/PLAN.md`: Ground truth for vision and goals.
@@ -16,11 +16,11 @@ This Monorepo houses Forge: an open-source, local-first Native AI coding agent e
 - UI changes require Tailwind adherence and Dark-mode-first CSS values.
 
 ## Safety Constraints
-- Only interact with paths mapped in `.forge` or configured user directories.
+- Only interact with paths mapped in `.codra` (or legacy `.forge` during migration) or configured user directories.
 - Ignore paths globally `.gitignore`'d when performing contextual parses.
 
 ## Architecture Rules
-1. Never import `apps/desktop` Types into `forge-core` Rust crates (use sharing abstractions like schemas or protocol maps).
+1. Never import `apps/desktop` Types into `codra-core` Rust crates (use sharing abstractions like schemas or protocol maps).
 2. The UI shell must remain completely isolated from real file manipulation except through dedicated Tauri commands.
 3. No fake backend mocked states in the React application except inside explicit `__mocks__` or test files.
 

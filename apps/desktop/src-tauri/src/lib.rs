@@ -1,22 +1,22 @@
 use std::sync::Mutex;
 use tauri::{State, Manager};
-use forge_protocol::*;
-use forge_tools::fs::LocalFileSystem;
-use forge_tools::git::LocalGit;
-use forge_tools::search::LocalSearch;
-use forge_tools::terminal::LocalTerminal;
-use forge_core::planner::PlannerService;
-use forge_core::executor::ExecutionOrchestrator;
-use forge_core::verifier::VerificationService;
-use forge_core::repair::RepairService;
-use forge_core::deploy::DeployPrepService;
-use forge_core::provider::{
+use codra_protocol::*;
+use codra_tools::fs::LocalFileSystem;
+use codra_tools::git::LocalGit;
+use codra_tools::search::LocalSearch;
+use codra_tools::terminal::LocalTerminal;
+use codra_core::planner::PlannerService;
+use codra_core::executor::ExecutionOrchestrator;
+use codra_core::verifier::VerificationService;
+use codra_core::repair::RepairService;
+use codra_core::deploy::DeployPrepService;
+use codra_core::provider::{
     create_provider, LiveProvider, EchoMockProvider, IntelligenceProvider,
 };
-use forge_core::provider_config::ProviderConfigService;
-use forge_core::config::GlobalConfigService;
+use codra_core::provider_config::ProviderConfigService;
+use codra_core::config::GlobalConfigService;
 
-use forge_browser::LocalBrowserService;
+use codra_browser::LocalBrowserService;
 
 struct AppState {
     workspace_root: Mutex<Option<String>>,
@@ -45,6 +45,29 @@ fn is_mock_mode(state: &State<'_, AppState>) -> bool {
     cfg.is_none()
 }
 
+fn find_latest_plan(workspace_path: &str) -> Option<ExecutionPlan> {
+    let roots = [".codra", ".forge"];
+
+    for root in roots {
+        let plans_dir = std::path::PathBuf::from(workspace_path).join(root).join("plans");
+        if let Ok(entries) = std::fs::read_dir(plans_dir) {
+            let mut latest_plan = None;
+            for entry in entries.flatten() {
+                if let Ok(p) = std::fs::read_to_string(entry.path()) {
+                    if let Ok(plan) = serde_json::from_str::<ExecutionPlan>(&p) {
+                        latest_plan = Some(plan);
+                    }
+                }
+            }
+            if latest_plan.is_some() {
+                return latest_plan;
+            }
+        }
+    }
+
+    None
+}
+
 #[tauri::command]
 fn check_health() -> String {
     "Rust Backend is online and healthy!".to_string()
@@ -55,18 +78,17 @@ fn open_workspace(path: String, state: State<'_, AppState>) -> Result<WorkspaceS
     *state.workspace_root.lock().unwrap() = Some(path.clone());
     let _ = state.global_config.lock().unwrap().set_last_workspace(path.clone());
 
-    // Auto-load provider config from workspace .forge/ if it exists
-
-    // Auto-load provider config from workspace .forge/ if it exists
+    // Auto-load provider config from workspace storage if it exists.
+    // The provider service reads from `.codra` first and falls back to legacy `.forge`.
     let config_svc = ProviderConfigService::new(&path);
     if let Some(cfg) = config_svc.load_config() {
-        eprintln!("[Forge Provider] Loaded config: {:?} / model: {}", cfg.kind, cfg.model_id);
+        eprintln!("[Codra Provider] Loaded config: {:?} / model: {}", cfg.kind, cfg.model_id);
         *state.provider_config.lock().unwrap() = Some(cfg);
     } else {
-        eprintln!("[Forge Provider] No persisted provider config found. Mock mode active.");
+        eprintln!("[Codra Provider] No persisted provider config found. Mock mode active.");
     }
     if let Some(key) = config_svc.load_api_key() {
-        eprintln!("[Forge Provider] API key loaded from .forge/");
+        eprintln!("[Codra Provider] API key loaded from workspace storage.");
         *state.provider_api_key.lock().unwrap() = Some(key);
     }
 
@@ -92,23 +114,11 @@ fn get_app_boot_data(state: State<'_, AppState>) -> Result<AppBootData, String> 
             boot_data.last_workspace = Some(ws);
             boot_data.provider_config = state.provider_config.lock().unwrap().clone();
 
-            // Check for existing plan/execution
-            let plans_dir = std::path::PathBuf::from(&path).join(".forge").join("plans");
-            if let Ok(entries) = std::fs::read_dir(plans_dir) {
-                // Find most recent plan
-                let mut latest_plan = None;
-                for entry in entries.flatten() {
-                    if let Ok(p) = std::fs::read_to_string(entry.path()) {
-                        if let Ok(plan) = serde_json::from_str::<ExecutionPlan>(&p) {
-                            latest_plan = Some(plan);
-                        }
-                    }
-                }
-                boot_data.active_plan = latest_plan;
-            }
+            // Check for existing plan/execution (supports legacy `.forge`).
+            boot_data.active_plan = find_latest_plan(&path);
 
             // Check for execution state
-            use forge_core::executor::ExecutionPersistenceService;
+            use codra_core::executor::ExecutionPersistenceService;
             let persistence = ExecutionPersistenceService::new(&path);
             if let Ok(st) = persistence.load_state() {
                 boot_data.active_execution = Some(st);
@@ -193,7 +203,7 @@ fn submit_task_for_planning(request: TaskRequest, state: State<'_, AppState>) ->
     let provider_box = resolve_provider_fast(&state);
     let live = LiveProvider::new(provider_box);
     let planner = PlannerService::new(&ws, &live);
-    eprintln!("[Forge Planner] Planning task with {} provider", if is_mock_mode(&state) { "mock" } else { "live" });
+    eprintln!("[Codra Planner] Planning task with {} provider", if is_mock_mode(&state) { "mock" } else { "live" });
     planner.create_plan(request)
 }
 
@@ -216,7 +226,7 @@ fn start_execution(plan: ExecutionPlan, state: State<'_, AppState>) -> Result<Ex
     let provider_box = resolve_provider_fast(&state);
     let live = LiveProvider::new(provider_box);
     let executor = ExecutionOrchestrator::new(&ws, &live);
-    eprintln!("[Forge Executor] Starting execution with {} provider", if is_mock_mode(&state) { "mock" } else { "live" });
+    eprintln!("[Codra Executor] Starting execution with {} provider", if is_mock_mode(&state) { "mock" } else { "live" });
     executor.start_execution(&plan)
 }
 
@@ -250,7 +260,7 @@ fn start_verification(execution_id: String, step_id: String, state: State<'_, Ap
     let provider_box = resolve_provider_fast(&state);
     let live = LiveProvider::new(provider_box);
     let verifier = VerificationService::new(&ws, &live);
-    eprintln!("[Forge Verifier] Starting verification with {} provider", if is_mock_mode(&state) { "mock" } else { "live" });
+    eprintln!("[Codra Verifier] Starting verification with {} provider", if is_mock_mode(&state) { "mock" } else { "live" });
     verifier.start_verification(&execution_id, &step_id)
 }
 
@@ -272,7 +282,7 @@ fn start_repair_attempt(retry_request: RetryRequest, state: State<'_, AppState>)
         .ok_or_else(|| "No workspace opened".to_string())?;
     let provider_box = resolve_provider_fast(&state);
     let repair = RepairService::new(&ws, provider_box.as_ref());
-    eprintln!("[Forge Repair] Generating repair with {} provider", if is_mock_mode(&state) { "mock" } else { "live" });
+    eprintln!("[Codra Repair] Generating repair with {} provider", if is_mock_mode(&state) { "mock" } else { "live" });
     repair.construct_repair_attempt(&retry_request)
 }
 
@@ -336,13 +346,13 @@ fn save_provider_config(config: ProviderConfig, api_key: Option<String>, state: 
             config_svc.save_api_key(key)?;
             cfg.api_key_set = true;
             *state.provider_api_key.lock().unwrap() = Some(key.clone());
-            eprintln!("[Forge Provider] API key saved (length: {})", key.len());
+            eprintln!("[Codra Provider] API key saved (length: {})", key.len());
         }
     }
 
     config_svc.save_config(&cfg)?;
     *state.provider_config.lock().unwrap() = Some(cfg.clone());
-    eprintln!("[Forge Provider] Config saved: {:?} / model: {}", cfg.kind, cfg.model_id);
+    eprintln!("[Codra Provider] Config saved: {:?} / model: {}", cfg.kind, cfg.model_id);
     Ok(cfg)
 }
 
@@ -352,7 +362,7 @@ fn check_provider_health(state: State<'_, AppState>) -> Result<ProviderHealthRes
         .unwrap_or_else(ProviderConfigService::default_config);
     let api_key = state.provider_api_key.lock().unwrap().clone();
 
-    eprintln!("[Forge Provider] Running health check against {:?} at {}", cfg.kind, cfg.base_url);
+    eprintln!("[Codra Provider] Running health check against {:?} at {}", cfg.kind, cfg.base_url);
     let provider = create_provider(&cfg, api_key.as_deref());
     provider.health_check()
 }
@@ -379,7 +389,7 @@ fn test_generation(prompt: String, state: State<'_, AppState>) -> Result<Generat
         temperature: Some(0.7),
     };
 
-    eprintln!("[Forge Provider] Test generation with {} mode", if is_mock_mode(&state) { "mock" } else { "live" });
+    eprintln!("[Codra Provider] Test generation with {} mode", if is_mock_mode(&state) { "mock" } else { "live" });
     provider_box.generate(&request)
 }
 

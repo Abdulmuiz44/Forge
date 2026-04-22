@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Button } from '@forge/ui';
+import { Button } from '@codra/ui';
 import { 
   Folder, Rocket, Zap, WifiOff, AlertTriangle, Terminal, Activity
 } from 'lucide-react';
@@ -11,7 +11,7 @@ import type {
   BrowserActionRequest, BrowserActionResult, BrowserActionKind, BrowserSessionState, 
   ProviderConfig, ProviderHealthResult, ProviderKind, ModelDescriptor, 
   GenerationResponse, AppBootData
-} from '@forge/shared';
+} from '@codra/shared';
 
 import { useNotify } from './context/NotificationContext';
 import { Sidebar } from './components/Sidebar';
@@ -280,7 +280,7 @@ function App() {
       <header className="flex h-12 w-full items-center justify-between border-b border-neutral-800 bg-neutral-900 px-4 shrink-0">
         <div className="flex items-center space-x-2 font-semibold tracking-tight text-neutral-300">
           <Zap className="w-4 h-4 text-blue-500" />
-          <span className="text-white">Forge</span> <span className="text-neutral-500 font-normal">Desktop</span>
+          <span className="text-white">Codra</span> <span className="text-neutral-500 font-normal">Desktop</span>
         </div>
         <div className="flex items-center space-x-3">
           {providerBadge}
@@ -361,7 +361,7 @@ function App() {
             </div>
             {isPlanning && <div className="text-xs font-mono text-neutral-500 animate-pulse">Planning task...</div>}
             <div className="text-xs text-neutral-400 leading-relaxed bg-neutral-900/50 p-4 rounded-xl border border-neutral-800">
-              Describe a task for Forge to process.
+              Describe a task for Codra to process.
             </div>
             
             {!workspace ? (
@@ -375,7 +375,7 @@ function App() {
                  <textarea 
                   value={taskIntent} 
                   onChange={e => setTaskIntent(e.target.value)} 
-                  placeholder="What should Forge build today?"
+                  placeholder="What should Codra build today?"
                   className="w-full bg-neutral-900 border border-neutral-800 rounded-xl p-3 text-xs outline-none focus:border-blue-500 resize-none min-h-[100px]"
                  />
                  <Button 

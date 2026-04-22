@@ -1,7 +1,7 @@
 {
-  "productName": "Forge",
+  "productName": "Codra",
   "version": "0.1.0",
-  "identifier": "com.forge.dev",
+  "identifier": "com.codra.dev",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
@@ -11,7 +11,7 @@
   "app": {
     "windows": [
       {
-        "title": "Forge",
+        "title": "Codra",
         "width": 1200,
         "height": 800,
         "decorations": true,

@@ -41,8 +41,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: v__VERSION__
-          releaseName: 'Forge v__VERSION__'
-          releaseBody: 'Download the latest version of Forge below.'
+          releaseName: 'Codra v__VERSION__'
+          releaseBody: 'Download the latest version of Codra below.'
           releaseDraft: true
           prerelease: false
           projectPath: ./apps/desktop

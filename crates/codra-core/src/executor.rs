@@ -1,4 +1,4 @@
-use forge_protocol::{
+use codra_protocol::{
     ExecutionPlan, ExecutionState, ExecutionStatus, ExecutionMode, StepExecutionRecord, 
     StepExecutionStatus, PatchProposal, PatchProposalStatus, ObservationRecord, ActionIntent, ActionKind
 };
@@ -13,7 +13,7 @@ pub struct JournalService {
 
 impl JournalService {
     pub fn new(workspace_root: &str) -> Self {
-        let dir = PathBuf::from(workspace_root).join(".forge").join("executions");
+        let dir = PathBuf::from(workspace_root).join(".codra").join("executions");
         let _ = fs::create_dir_all(&dir);
         Self { root_path: dir }
     }
@@ -31,13 +31,15 @@ impl JournalService {
 
 pub struct ExecutionPersistenceService {
     root_path: PathBuf,
+    legacy_root_path: PathBuf,
 }
 
 impl ExecutionPersistenceService {
     pub fn new(workspace_root: &str) -> Self {
-        let dir = PathBuf::from(workspace_root).join(".forge").join("executions");
+        let dir = PathBuf::from(workspace_root).join(".codra").join("executions");
+        let legacy_dir = PathBuf::from(workspace_root).join(".forge").join("executions");
         let _ = fs::create_dir_all(&dir);
-        Self { root_path: dir }
+        Self { root_path: dir, legacy_root_path: legacy_dir }
     }
 
     pub fn save_state(&self, state: &ExecutionState) -> Result<(), String> {
@@ -48,7 +50,17 @@ impl ExecutionPersistenceService {
 
     pub fn load_state(&self) -> Result<ExecutionState, String> {
         let file_path = self.root_path.join("state.json");
-        let data = fs::read_to_string(file_path).map_err(|e| e.to_string())?;
+        let data = match fs::read_to_string(&file_path) {
+            Ok(data) => data,
+            Err(primary_err) => {
+                if primary_err.kind() != std::io::ErrorKind::NotFound {
+                    return Err(primary_err.to_string());
+                }
+
+                let legacy_file_path = self.legacy_root_path.join("state.json");
+                fs::read_to_string(legacy_file_path).map_err(|legacy_err| legacy_err.to_string())?
+            }
+        };
         serde_json::from_str(&data).map_err(|e| e.to_string())
     }
 
@@ -149,7 +161,7 @@ impl<'a> ExecutionOrchestrator<'a> {
                 step_id: step.id.clone(),
                 target_file: intent.target.clone(),
                 rationale: intent.reason.clone(),
-                diff_content: format!("@@ -1,5 +1,6 @@\n+ // Autonomous Edit By Forge\n  fn existing() {{\n  }}"),
+                diff_content: format!("@@ -1,5 +1,6 @@\n+ // Autonomous Edit By Codra\n  fn existing() {{\n  }}"),
                 status: PatchProposalStatus::ReadyForReview,
                 timestamp: Utc::now().to_rfc3339(),
             });

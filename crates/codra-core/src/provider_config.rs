@@ -1,4 +1,4 @@
-use forge_protocol::{ProviderConfig, ProviderKind};
+use codra_protocol::{ProviderConfig, ProviderKind};
 use std::path::PathBuf;
 use std::fs;
 
@@ -7,18 +7,25 @@ const SECRET_FILE: &str = "provider_secret.key";
 
 pub struct ProviderConfigService {
     config_dir: PathBuf,
+    legacy_config_dir: PathBuf,
 }
 
 impl ProviderConfigService {
     pub fn new(workspace_root: &str) -> Self {
-        let dir = PathBuf::from(workspace_root).join(".forge");
-        let _ = fs::create_dir_all(&dir);
-        Self { config_dir: dir }
+        let config_dir = PathBuf::from(workspace_root).join(".codra");
+        let legacy_config_dir = PathBuf::from(workspace_root).join(".forge");
+        let _ = fs::create_dir_all(&config_dir);
+        Self { config_dir, legacy_config_dir }
     }
 
     pub fn load_config(&self) -> Option<ProviderConfig> {
         let path = self.config_dir.join(CONFIG_FILE);
-        let data = fs::read_to_string(path).ok()?;
+        if let Ok(data) = fs::read_to_string(path) {
+            return serde_json::from_str(&data).ok();
+        }
+
+        let legacy_path = self.legacy_config_dir.join(CONFIG_FILE);
+        let data = fs::read_to_string(legacy_path).ok()?;
         serde_json::from_str(&data).ok()
     }
 
@@ -37,7 +44,12 @@ impl ProviderConfigService {
 
     pub fn load_api_key(&self) -> Option<String> {
         let path = self.config_dir.join(SECRET_FILE);
-        fs::read_to_string(path).ok().map(|s| s.trim().to_string())
+        if let Ok(data) = fs::read_to_string(path) {
+            return Some(data.trim().to_string());
+        }
+
+        let legacy_path = self.legacy_config_dir.join(SECRET_FILE);
+        fs::read_to_string(legacy_path).ok().map(|s| s.trim().to_string())
     }
 
     pub fn default_config() -> ProviderConfig {

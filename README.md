@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="assets/logo.png" width="180" alt="Forge Logo">
+  <img src="assets/logo.png" width="180" alt="Codra Logo">
 </p>
 
-<h1 align="center">Forge</h1>
+<h1 align="center">Codra</h1>
 
 <p align="center">
   <strong>The Local-First AI Coding Agent for Serious Engineering.</strong>
@@ -16,11 +16,11 @@
 
 ---
 
-**Forge** is a native, local-first AI software engineering agent designed to live where your code lives. Unlike cloud-based agents, Forge operates with direct access to your local file system, tools, and browser, maintaining a high-fidelity feedback loop without the latency or privacy concerns of remote proxies.
+**Codra** is a native, local-first AI software engineering agent designed to live where your code lives. Unlike cloud-based agents, Codra operates with direct access to your local file system, tools, and browser, maintaining a high-fidelity feedback loop without the latency or privacy concerns of remote proxies.
 
 ## 🚀 Core Pillars
 
-- **Privately Native**: Forge runs as a local Tauri desktop application. Your code never leaves your machine unless explicitly sent to your configured AI provider.
+- **Privately Native**: Codra runs as a local Tauri desktop application. Your code never leaves your machine unless explicitly sent to your configured AI provider.
 - **Unified Intelligence Loop**: Integrates a multi-stage orchestration system:
   - **Planner**: Strategizes multi-file changes and architectural shifts.
   - **Executor**: Applies surgical patches with high precision.
@@ -39,15 +39,15 @@
 
 ## 🏁 Getting Started
 
-1. **Launch Forge**: Open the desktop application.
-2. **Connect Workspace**: Point Forge to any local repository path.
+1. **Launch Codra**: Open the desktop application.
+2. **Connect Workspace**: Point Codra to any local repository path.
 3. **Configure Provider**: Set up Ollama (local) or your preferred API provider.
-4. **Build**: Simply describe your intent and let Forge handle the orchestration.
+4. **Build**: Simply describe your intent and let Codra handle the orchestration.
 
 ## 🏗️ Architecture
 
-Forge is built on a high-performance stack for low-latency engineering:
-- **Core**: Rust (using `forge-core`) for heavy-duty system interaction.
+Codra is built on a high-performance stack for low-latency engineering:
+- **Core**: Rust (using `codra-core`) for heavy-duty system interaction.
 - **Frontend**: React + Tailwind for a premium, responsive UI.
 - **Bridge**: Tauri for secure, typed IPC between the UI and local system.
 - **Protocol**: Shared schemas between Rust and TypeScript for 100% type safety.

@@ -1,4 +1,4 @@
-use forge_protocol::*;
+use codra_protocol::*;
 
 pub trait WorkspaceService {
     fn open_workspace(&self, path: &str) -> Result<WorkspaceSummary, String>;

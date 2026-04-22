@@ -1,4 +1,4 @@
-use forge_protocol::{
+use codra_protocol::{
     RetryRequest, RepairAttempt, RepairAttemptStatus, PatchProposal, PatchProposalStatus,
     GenerationRequest, GenerationMode,
 };

@@ -1,4 +1,4 @@
-use forge_protocol::{SearchQuery, SearchMatch};
+use codra_protocol::{SearchQuery, SearchMatch};
 use ignore::WalkBuilder;
 use regex::Regex;
 use std::path::PathBuf;

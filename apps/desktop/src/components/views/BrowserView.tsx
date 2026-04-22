@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { Globe, X, Play, Code, Layout, Terminal, RefreshCw, Zap } from 'lucide-react';
-import { Button } from '@forge/ui';
-import type { BrowserSessionState, BrowserActionKind } from '@forge/shared';
+import { Button } from '@codra/ui';
+import type { BrowserSessionState, BrowserActionKind } from '@codra/shared';
 
 interface BrowserViewProps {
   browserSession: BrowserSessionState | null;

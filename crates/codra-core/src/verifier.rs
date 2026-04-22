@@ -1,4 +1,4 @@
-use forge_protocol::{
+use codra_protocol::{
     VerificationState, VerificationStatus, VerificationCheck, VerificationCheckKind,
     RetryRecommendation, RetryRequest
 };
@@ -13,7 +13,7 @@ pub struct VerifierPersistence {
 
 impl VerifierPersistence {
     pub fn new(workspace_root: &str) -> Self {
-        let dir = PathBuf::from(workspace_root).join(".forge").join("verifications");
+        let dir = PathBuf::from(workspace_root).join(".codra").join("verifications");
         let _ = fs::create_dir_all(&dir);
         Self { root_path: dir }
     }

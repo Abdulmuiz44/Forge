@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction, RefObject } from 'react';
 import { Activity, CheckCircle, ShieldAlert, X, Check } from 'lucide-react';
-import { Button } from '@forge/ui';
-import type { ExecutionState, PatchProposal, RepairAttempt } from '@forge/shared';
+import { Button } from '@codra/ui';
+import type { ExecutionState, PatchProposal, RepairAttempt } from '@codra/shared';
 
 interface ExecutorViewProps {
   execState: ExecutionState | null;

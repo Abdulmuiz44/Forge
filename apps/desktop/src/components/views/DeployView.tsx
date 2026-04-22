@@ -1,6 +1,6 @@
 import { Rocket, Terminal, Play, ShieldAlert } from 'lucide-react';
-import { Button } from '@forge/ui';
-import type { DeployPrepSummary } from '@forge/shared';
+import { Button } from '@codra/ui';
+import type { DeployPrepSummary } from '@codra/shared';
 
 interface DeployViewProps {
   deployState: DeployPrepSummary | null;

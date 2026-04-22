@@ -1,6 +1,6 @@
 import { CheckCircle, RefreshCw, ArrowRight } from 'lucide-react';
-import { Button } from '@forge/ui';
-import type { VerificationState, RetryRequest } from '@forge/shared';
+import { Button } from '@codra/ui';
+import type { VerificationState, RetryRequest } from '@codra/shared';
 
 interface VerifierViewProps {
   verState: VerificationState | null;

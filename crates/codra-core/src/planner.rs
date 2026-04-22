@@ -1,4 +1,4 @@
-use forge_protocol::{TaskRequest, TaskContext, ExecutionPlan, PlanStatus};
+use codra_protocol::{TaskRequest, TaskContext, ExecutionPlan, PlanStatus};
 use crate::provider::ModelProvider;
 use std::path::PathBuf;
 use std::fs;
@@ -6,14 +6,16 @@ use std::fs;
 // --- Persistence Service ---
 pub struct PlanPersistenceService {
     root_path: PathBuf,
+    legacy_root_path: PathBuf,
 }
 
 impl PlanPersistenceService {
     pub fn new(root: impl Into<PathBuf>) -> Self {
         let root_path = root.into();
-        let plans_dir = root_path.join(".forge").join("plans");
+        let plans_dir = root_path.join(".codra").join("plans");
+        let legacy_plans_dir = root_path.join(".forge").join("plans");
         let _ = fs::create_dir_all(&plans_dir);
-        Self { root_path: plans_dir }
+        Self { root_path: plans_dir, legacy_root_path: legacy_plans_dir }
     }
 
     pub fn save_plan(&self, plan: &ExecutionPlan) -> Result<(), String> {
@@ -24,7 +26,17 @@ impl PlanPersistenceService {
 
     pub fn load_plan(&self, plan_id: &str) -> Result<ExecutionPlan, String> {
         let file_path = self.root_path.join(format!("{}.json", plan_id));
-        let data = fs::read_to_string(file_path).map_err(|e| e.to_string())?;
+        let data = match fs::read_to_string(&file_path) {
+            Ok(data) => data,
+            Err(primary_err) => {
+                if primary_err.kind() != std::io::ErrorKind::NotFound {
+                    return Err(primary_err.to_string());
+                }
+
+                let legacy_file_path = self.legacy_root_path.join(format!("{}.json", plan_id));
+                fs::read_to_string(legacy_file_path).map_err(|legacy_err| legacy_err.to_string())?
+            }
+        };
         serde_json::from_str(&data).map_err(|e| e.to_string())
     }
 }

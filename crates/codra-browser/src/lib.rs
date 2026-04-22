@@ -1,6 +1,6 @@
 pub mod managed;
 
-use forge_protocol::*;
+use codra_protocol::*;
 pub use managed::BrowserSession;
 use std::path::PathBuf;
 

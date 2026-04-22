@@ -1,6 +1,6 @@
 import { Server, Wifi, WifiOff, RefreshCw, Zap, Check } from 'lucide-react';
-import { Button } from '@forge/ui';
-import type { ProviderConfig, ProviderHealthResult, ProviderKind, ModelDescriptor } from '@forge/shared';
+import { Button } from '@codra/ui';
+import type { ProviderConfig, ProviderHealthResult, ProviderKind, ModelDescriptor } from '@codra/shared';
 
 interface SettingsViewProps {
   providerHealth: ProviderHealthResult | null;

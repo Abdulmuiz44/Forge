@@ -1,5 +1,5 @@
 [package]
-name = "forge-tools"
+name = "codra-tools"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,7 +8,7 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
-forge-protocol = { path = "../forge-protocol" }
+codra-protocol = { path = "../codra-protocol" }
 ignore = "0.4"
 regex = "1.10"
 uuid = { version = "1.7", features = ["v4", "fast-rng"] }

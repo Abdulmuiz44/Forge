@@ -1,5 +1,5 @@
 use std::process::Command;
-use forge_protocol::{GitStatusSummary};
+use codra_protocol::{GitStatusSummary};
 use std::path::PathBuf;
 
 pub struct LocalGit {

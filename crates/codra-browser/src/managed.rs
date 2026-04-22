@@ -1,6 +1,6 @@
 use headless_chrome::{Browser, LaunchOptions, Tab};
 use std::sync::Arc;
-use forge_protocol::*;
+use codra_protocol::*;
 use std::path::PathBuf;
 use std::fs;
 use chrono::Utc;
@@ -26,7 +26,7 @@ impl BrowserSession {
             .map_err(|e| format!("Failed to create initial tab: {}", e))?;
 
         // Ensure artifact directory exists
-        let artifact_dir = workspace_root.join(".forge/browser/artifacts");
+        let artifact_dir = workspace_root.join(".codra/browser/artifacts");
         if !artifact_dir.exists() {
             fs::create_dir_all(&artifact_dir).map_err(|e| e.to_string())?;
         }
@@ -75,7 +75,7 @@ impl BrowserSession {
         ).map_err(|e| e.to_string())?;
 
         let filename = format!("screenshot_{}_{}.png", action_id, Utc::now().timestamp());
-        let relative_path = format!(".forge/browser/artifacts/{}", filename);
+        let relative_path = format!(".codra/browser/artifacts/{}", filename);
         let full_path = self.workspace_root.join(&relative_path);
 
         fs::write(&full_path, &png_data).map_err(|e| e.to_string())?;

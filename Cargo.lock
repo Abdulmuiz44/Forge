@@ -350,6 +350,77 @@ dependencies = [
 ]
 
 [[package]]
+name = "codra-browser"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "chrono",
+ "codra-protocol",
+ "headless_chrome",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "codra-core"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "codra-protocol",
+ "codra-tools",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "codra-deploy"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
+name = "codra-memory"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "codra-protocol"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "codra-tools"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "codra-protocol",
+ "ignore",
+ "regex",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "combine"
 version = "4.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -709,10 +780,10 @@ dependencies = [
 name = "desktop"
 version = "0.1.0"
 dependencies = [
- "forge-browser",
- "forge-core",
- "forge-protocol",
- "forge-tools",
+ "codra-browser",
+ "codra-core",
+ "codra-protocol",
+ "codra-tools",
  "serde",
  "serde_json",
  "tauri",
@@ -1004,77 +1075,6 @@ name = "foreign-types-shared"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa9a19cbb55df58761df49b23516a86d432839add4af60fc256da840f66ed35b"
-
-[[package]]
-name = "forge-browser"
-version = "0.1.0"
-dependencies = [
- "base64 0.22.1",
- "chrono",
- "forge-protocol",
- "headless_chrome",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "forge-core"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "forge-protocol",
- "forge-tools",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "forge-deploy"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
-]
-
-[[package]]
-name = "forge-memory"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "forge-protocol"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "forge-tools"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "forge-protocol",
- "ignore",
- "regex",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "uuid",
-]
 
 [[package]]
 name = "form_urlencoded"

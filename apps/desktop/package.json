@@ -15,8 +15,8 @@
     "react-dom": "^19.2.4",
     "lucide-react": "^0.470.0",
     "@tauri-apps/api": "^2.0.0",
-    "@forge/shared": "workspace:*",
-    "@forge/ui": "workspace:*"
+    "@codra/shared": "workspace:*",
+    "@codra/ui": "workspace:*"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

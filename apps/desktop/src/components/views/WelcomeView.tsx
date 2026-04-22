@@ -1,6 +1,6 @@
 import { Rocket, Code, ShieldAlert, Zap, ArrowRight, Cpu, Activity } from 'lucide-react';
-import { Button } from '@forge/ui';
-import type { WorkspaceSummary } from '@forge/shared';
+import { Button } from '@codra/ui';
+import type { WorkspaceSummary } from '@codra/shared';
 
 interface WelcomeViewProps {
   workspace: WorkspaceSummary | null;
@@ -27,7 +27,7 @@ export function WelcomeView({
           <Rocket className="w-20 h-20 mx-auto text-blue-500 relative" />
         </div>
         <div>
-          <h1 className="text-5xl font-bold tracking-tighter text-white mb-4 italic">FORGE</h1>
+          <h1 className="text-5xl font-bold tracking-tighter text-white mb-4 italic">CODRA</h1>
           <p className="text-neutral-400 text-lg leading-relaxed">
             Local-first, native AI software engineering agent. Deep workspace integration without cloud boundaries.
           </p>

@@ -1,6 +1,6 @@
 import { Map, Check, Play, CheckCircle } from 'lucide-react';
-import { Button } from '@forge/ui';
-import type { ExecutionPlan, PlanStatus } from '@forge/shared';
+import { Button } from '@codra/ui';
+import type { ExecutionPlan, PlanStatus } from '@codra/shared';
 
 interface PlanViewProps {
   activePlan: ExecutionPlan | null;

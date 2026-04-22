@@ -1,4 +1,4 @@
-use forge_protocol::{
+use codra_protocol::{
     TaskContext, ExecutionPlan, ArchitectureProposal, PlannerOutput, PlanStep,
     ActionIntent, ActionKind, VerificationCheck, VerificationFinding,
     FailureClassification, VerificationSeverity, GenerationRequest,
@@ -443,30 +443,30 @@ impl ModelProvider for LiveProvider {
                     plan: ExecutionPlan {
                         id: uuid::Uuid::new_v4().to_string(),
                         task_id: "live_task".to_string(),
-                        status: forge_protocol::PlanStatus::Draft,
+                        status: codra_protocol::PlanStatus::Draft,
                         title: format!("Plan for: {}", &context.intent[..context.intent.len().min(60)]),
                         objective: context.intent.clone(),
                         steps: vec![
-                            forge_protocol::PlanStep {
+                            codra_protocol::PlanStep {
                                 id: "step_1".to_string(),
-                                kind: forge_protocol::PlanStepKind::Inspect,
+                                kind: codra_protocol::PlanStepKind::Inspect,
                                 title: "Analyze workspace context".to_string(),
                                 objective: "Assess current state of relevant files.".to_string(),
-                                status: forge_protocol::PlanStepStatus::Pending,
+                                status: codra_protocol::PlanStepStatus::Pending,
                                 files_likely_involved: vec![],
                                 required_tools: vec!["fs_list".to_string()],
                             },
-                            forge_protocol::PlanStep {
+                            codra_protocol::PlanStep {
                                 id: "step_2".to_string(),
-                                kind: forge_protocol::PlanStepKind::Edit,
+                                kind: codra_protocol::PlanStepKind::Edit,
                                 title: "Implement changes".to_string(),
                                 objective: response.content[..response.content.len().min(200)].to_string(),
-                                status: forge_protocol::PlanStepStatus::Pending,
+                                status: codra_protocol::PlanStepStatus::Pending,
                                 files_likely_involved: vec!["src/main.rs".to_string()],
                                 required_tools: vec!["fs_write".to_string()],
                             },
                         ],
-                        dependencies: vec![forge_protocol::PlanDependency { step_id: "step_2".to_string(), depends_on: "step_1".to_string() }],
+                        dependencies: vec![codra_protocol::PlanDependency { step_id: "step_2".to_string(), depends_on: "step_1".to_string() }],
                         assumptions: vec![],
                         risks: vec![],
                         architecture_proposal: None,
@@ -575,16 +575,16 @@ impl ModelProvider for EchoMockProvider {
         let mut plan = ExecutionPlan {
             id: uuid::Uuid::new_v4().to_string(),
             task_id: "mock_task_id".to_string(),
-            status: forge_protocol::PlanStatus::Draft,
+            status: codra_protocol::PlanStatus::Draft,
             title: "Generated Mock Plan".to_string(),
             objective: context.intent.clone(),
             steps: vec![
-                forge_protocol::PlanStep { id: "step_1".to_string(), kind: forge_protocol::PlanStepKind::Inspect, title: "Inspect Workspace".to_string(), objective: "Verify current state matches assumptions.".to_string(), status: forge_protocol::PlanStepStatus::Pending, files_likely_involved: vec![], required_tools: vec!["fs_list".to_string()] },
-                forge_protocol::PlanStep { id: "step_2".to_string(), kind: forge_protocol::PlanStepKind::Edit, title: "Implement requested feature".to_string(), objective: "Apply code changes according to architecture.".to_string(), status: forge_protocol::PlanStepStatus::Pending, files_likely_involved: vec!["src/main.rs".to_string()], required_tools: vec!["fs_write".to_string()] },
+                codra_protocol::PlanStep { id: "step_1".to_string(), kind: codra_protocol::PlanStepKind::Inspect, title: "Inspect Workspace".to_string(), objective: "Verify current state matches assumptions.".to_string(), status: codra_protocol::PlanStepStatus::Pending, files_likely_involved: vec![], required_tools: vec!["fs_list".to_string()] },
+                codra_protocol::PlanStep { id: "step_2".to_string(), kind: codra_protocol::PlanStepKind::Edit, title: "Implement requested feature".to_string(), objective: "Apply code changes according to architecture.".to_string(), status: codra_protocol::PlanStepStatus::Pending, files_likely_involved: vec!["src/main.rs".to_string()], required_tools: vec!["fs_write".to_string()] },
             ],
-            dependencies: vec![forge_protocol::PlanDependency { step_id: "step_2".to_string(), depends_on: "step_1".to_string() }],
-            assumptions: vec![forge_protocol::AssumptionItem { description: "Rust toolchain is installed.".to_string(), confidence: "high".to_string() }],
-            risks: vec![forge_protocol::RiskItem { description: "File lock might exist.".to_string(), severity: "low".to_string() }],
+            dependencies: vec![codra_protocol::PlanDependency { step_id: "step_2".to_string(), depends_on: "step_1".to_string() }],
+            assumptions: vec![codra_protocol::AssumptionItem { description: "Rust toolchain is installed.".to_string(), confidence: "high".to_string() }],
+            risks: vec![codra_protocol::RiskItem { description: "File lock might exist.".to_string(), severity: "low".to_string() }],
             architecture_proposal: None,
         };
         if needs_arch { plan.architecture_proposal = Some(self.generate_architecture(&plan)?); }
