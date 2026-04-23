@@ -16,7 +16,7 @@ This Monorepo houses Codra: an open-source, local-first Native AI coding agent e
 - UI changes require Tailwind adherence and Dark-mode-first CSS values.
 
 ## Safety Constraints
-- Only interact with paths mapped in `.codra` (or legacy `.forge` during migration) or configured user directories.
+- Only interact with paths mapped in `.codra` or configured user directories.
 - Ignore paths globally `.gitignore`'d when performing contextual parses.
 
 ## Architecture Rules

@@ -1,10 +1,10 @@
-use codra_protocol::{
-    RetryRequest, RepairAttempt, RepairAttemptStatus, PatchProposal, PatchProposalStatus,
-    GenerationRequest, GenerationMode,
-};
 use crate::provider::IntelligenceProvider;
-use uuid::Uuid;
 use chrono::Utc;
+use codra_protocol::{
+    GenerationMode, GenerationRequest, PatchProposal, PatchProposalStatus, RepairAttempt,
+    RepairAttemptStatus, RetryRequest,
+};
+use uuid::Uuid;
 
 pub struct RepairService<'a> {
     _workspace_root: String,
@@ -19,7 +19,10 @@ impl<'a> RepairService<'a> {
         }
     }
 
-    pub fn construct_repair_attempt(&self, retry_request: &RetryRequest) -> Result<RepairAttempt, String> {
+    pub fn construct_repair_attempt(
+        &self,
+        retry_request: &RetryRequest,
+    ) -> Result<RepairAttempt, String> {
         let attempt_number = 1;
         let max_retries = 3;
 
@@ -35,7 +38,9 @@ impl<'a> RepairService<'a> {
                 "Failure summary: {}\nSuggested scope: {}\nAffected findings:\n{}",
                 retry_request.failure_summary,
                 retry_request.suggested_scope,
-                retry_request.findings.iter()
+                retry_request
+                    .findings
+                    .iter()
                     .map(|f| format!("- [{}] {}", format!("{:?}", f.classification), f.message))
                     .collect::<Vec<_>>()
                     .join("\n")
@@ -48,11 +53,16 @@ impl<'a> RepairService<'a> {
             Ok(response) => response.content,
             Err(e) => {
                 // Explicit fallback: still produce the attempt structure but note the failure
-                format!("// Provider repair generation failed: {}\n// Manual intervention required", e)
+                format!(
+                    "// Provider repair generation failed: {}\n// Manual intervention required",
+                    e
+                )
             }
         };
 
-        let target_file = retry_request.findings.first()
+        let target_file = retry_request
+            .findings
+            .first()
             .and_then(|f| f.affected_files.first().cloned())
             .unwrap_or_else(|| "src/main.rs".to_string());
 
@@ -60,7 +70,10 @@ impl<'a> RepairService<'a> {
             id: Uuid::new_v4().to_string(),
             step_id: retry_request.step_id.clone(),
             target_file,
-            rationale: format!("Attempt {}: {}", attempt_number, retry_request.suggested_scope),
+            rationale: format!(
+                "Attempt {}: {}",
+                attempt_number, retry_request.suggested_scope
+            ),
             diff_content,
             status: PatchProposalStatus::ReadyForReview,
             timestamp: Utc::now().to_rfc3339(),

@@ -1,31 +1,24 @@
 use codra_protocol::{ProviderConfig, ProviderKind};
-use std::path::PathBuf;
 use std::fs;
+use std::path::PathBuf;
 
 const CONFIG_FILE: &str = "provider_config.json";
 const SECRET_FILE: &str = "provider_secret.key";
 
 pub struct ProviderConfigService {
     config_dir: PathBuf,
-    legacy_config_dir: PathBuf,
 }
 
 impl ProviderConfigService {
     pub fn new(workspace_root: &str) -> Self {
         let config_dir = PathBuf::from(workspace_root).join(".codra");
-        let legacy_config_dir = PathBuf::from(workspace_root).join(".forge");
         let _ = fs::create_dir_all(&config_dir);
-        Self { config_dir, legacy_config_dir }
+        Self { config_dir }
     }
 
     pub fn load_config(&self) -> Option<ProviderConfig> {
         let path = self.config_dir.join(CONFIG_FILE);
-        if let Ok(data) = fs::read_to_string(path) {
-            return serde_json::from_str(&data).ok();
-        }
-
-        let legacy_path = self.legacy_config_dir.join(CONFIG_FILE);
-        let data = fs::read_to_string(legacy_path).ok()?;
+        let data = fs::read_to_string(path).ok()?;
         serde_json::from_str(&data).ok()
     }
 
@@ -44,20 +37,18 @@ impl ProviderConfigService {
 
     pub fn load_api_key(&self) -> Option<String> {
         let path = self.config_dir.join(SECRET_FILE);
-        if let Ok(data) = fs::read_to_string(path) {
-            return Some(data.trim().to_string());
-        }
-
-        let legacy_path = self.legacy_config_dir.join(SECRET_FILE);
-        fs::read_to_string(legacy_path).ok().map(|s| s.trim().to_string())
+        fs::read_to_string(path).ok().map(|s| s.trim().to_string())
     }
 
     pub fn default_config() -> ProviderConfig {
         ProviderConfig {
             kind: ProviderKind::Ollama,
-            base_url: "http://localhost:11434".to_string(),
-            model_id: "llama3.2".to_string(),
-            api_key_set: false,
+            base_url: std::env::var("CODRA_PROVIDER_BASE_URL")
+                .unwrap_or_else(|_| "http://localhost:11434".to_string()),
+            model_id: std::env::var("CODRA_MODEL").unwrap_or_else(|_| "llama3.2".to_string()),
+            api_key_set: std::env::var("CODRA_API_KEY").is_ok(),
+            profile_id: "default".to_string(),
+            profile_name: "Default".to_string(),
         }
     }
 }

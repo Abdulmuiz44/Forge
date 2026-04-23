@@ -1,9 +1,8 @@
 use codra_protocol::{
-    TaskContext, ExecutionPlan, ArchitectureProposal, PlannerOutput, PlanStep,
-    ActionIntent, ActionKind, VerificationCheck, VerificationFinding,
-    FailureClassification, VerificationSeverity, GenerationRequest,
-    GenerationResponse, GenerationMode, ProviderConfig, ProviderKind,
-    ProviderHealthResult, ProviderStatus, ModelDescriptor, TokenUsage,
+    ActionIntent, ActionKind, ArchitectureProposal, ExecutionPlan, FailureClassification,
+    GenerationMode, GenerationRequest, GenerationResponse, ModelDescriptor, PlanStep,
+    PlannerOutput, ProviderConfig, ProviderHealthResult, ProviderKind, ProviderStatus, TaskContext,
+    TokenUsage, VerificationCheck, VerificationFinding, VerificationSeverity,
 };
 use serde::{Deserialize, Serialize};
 
@@ -27,7 +26,11 @@ pub trait ExecutionProvider {
 }
 
 pub trait VerificationProvider {
-    fn parse_outputs(&self, check: &VerificationCheck, raw_stdout: &str) -> (Vec<VerificationFinding>, String);
+    fn parse_outputs(
+        &self,
+        check: &VerificationCheck,
+        raw_stdout: &str,
+    ) -> (Vec<VerificationFinding>, String);
 }
 
 // ===== OLLAMA ADAPTER =====
@@ -126,7 +129,11 @@ impl IntelligenceProvider for OllamaProvider {
 
         Ok(GenerationResponse {
             content: ollama_resp.response,
-            finish_reason: if ollama_resp.done { Some("stop".to_string()) } else { None },
+            finish_reason: if ollama_resp.done {
+                Some("stop".to_string())
+            } else {
+                None
+            },
             token_usage: usage,
         })
     }
@@ -140,16 +147,25 @@ impl IntelligenceProvider for OllamaProvider {
 
         match client.get(&url).send() {
             Ok(resp) if resp.status().is_success() => {
-                let tags: OllamaTagsResponse = resp.json().unwrap_or(OllamaTagsResponse { models: vec![] });
+                let tags: OllamaTagsResponse =
+                    resp.json().unwrap_or(OllamaTagsResponse { models: vec![] });
                 let model_available = tags.models.iter().any(|m| m.name.starts_with(&self.model));
                 Ok(ProviderHealthResult {
                     reachable: true,
                     model_available,
-                    status: if model_available { ProviderStatus::Connected } else { ProviderStatus::Degraded },
+                    status: if model_available {
+                        ProviderStatus::Connected
+                    } else {
+                        ProviderStatus::Degraded
+                    },
                     message: if model_available {
                         format!("Connected to Ollama. Model '{}' is available.", self.model)
                     } else {
-                        format!("Connected to Ollama but model '{}' not found. Available: {:?}", self.model, tags.models.iter().map(|m| &m.name).collect::<Vec<_>>())
+                        format!(
+                            "Connected to Ollama but model '{}' not found. Available: {:?}",
+                            self.model,
+                            tags.models.iter().map(|m| &m.name).collect::<Vec<_>>()
+                        )
                     },
                 })
             }
@@ -175,14 +191,23 @@ impl IntelligenceProvider for OllamaProvider {
             .build()
             .map_err(|e| e.to_string())?;
 
-        let resp = client.get(&url).send().map_err(|e| format!("Failed to reach Ollama: {}", e))?;
+        let resp = client
+            .get(&url)
+            .send()
+            .map_err(|e| format!("Failed to reach Ollama: {}", e))?;
         let tags: OllamaTagsResponse = resp.json().map_err(|e| format!("Parse error: {}", e))?;
 
-        Ok(tags.models.iter().map(|m| ModelDescriptor {
-            id: m.name.clone(),
-            name: m.name.clone(),
-            context_length: None,
-        }).collect())
+        Ok(tags
+            .models
+            .iter()
+            .map(|m| ModelDescriptor {
+                id: m.name.clone(),
+                name: m.name.clone(),
+                context_length: None,
+                supports_tools: false,
+                supports_vision: false,
+            })
+            .collect())
     }
 }
 
@@ -255,8 +280,14 @@ impl IntelligenceProvider for OpenAiCompatibleProvider {
         let body = OpenAiChatRequest {
             model: self.model.clone(),
             messages: vec![
-                OpenAiMessage { role: "system".to_string(), content: request.system_prompt.clone() },
-                OpenAiMessage { role: "user".to_string(), content: request.user_prompt.clone() },
+                OpenAiMessage {
+                    role: "system".to_string(),
+                    content: request.system_prompt.clone(),
+                },
+                OpenAiMessage {
+                    role: "user".to_string(),
+                    content: request.user_prompt.clone(),
+                },
             ],
             max_tokens: request.max_tokens,
             temperature: request.temperature,
@@ -272,7 +303,9 @@ impl IntelligenceProvider for OpenAiCompatibleProvider {
             req_builder = req_builder.header("Authorization", format!("Bearer {}", key));
         }
 
-        let resp = req_builder.send().map_err(|e| format!("Request failed: {}", e))?;
+        let resp = req_builder
+            .send()
+            .map_err(|e| format!("Request failed: {}", e))?;
 
         if !resp.status().is_success() {
             let status = resp.status();
@@ -280,8 +313,12 @@ impl IntelligenceProvider for OpenAiCompatibleProvider {
             return Err(format!("Provider returned HTTP {}: {}", status, body_text));
         }
 
-        let chat_resp: OpenAiChatResponse = resp.json().map_err(|e| format!("Parse error: {}", e))?;
-        let choice = chat_resp.choices.first().ok_or("Empty response from provider")?;
+        let chat_resp: OpenAiChatResponse =
+            resp.json().map_err(|e| format!("Parse error: {}", e))?;
+        let choice = chat_resp
+            .choices
+            .first()
+            .ok_or("Empty response from provider")?;
 
         let usage = chat_resp.usage.map(|u| TokenUsage {
             prompt_tokens: u.prompt_tokens,
@@ -309,14 +346,12 @@ impl IntelligenceProvider for OpenAiCompatibleProvider {
         }
 
         match req.send() {
-            Ok(resp) if resp.status().is_success() => {
-                Ok(ProviderHealthResult {
-                    reachable: true,
-                    model_available: true,
-                    status: ProviderStatus::Connected,
-                    message: format!("Connected to {} with model '{}'", self.base_url, self.model),
-                })
-            }
+            Ok(resp) if resp.status().is_success() => Ok(ProviderHealthResult {
+                reachable: true,
+                model_available: true,
+                status: ProviderStatus::Connected,
+                message: format!("Connected to {} with model '{}'", self.base_url, self.model),
+            }),
             Ok(resp) => Ok(ProviderHealthResult {
                 reachable: true,
                 model_available: false,
@@ -345,13 +380,20 @@ impl IntelligenceProvider for OpenAiCompatibleProvider {
         }
 
         let resp = req.send().map_err(|e| format!("Failed: {}", e))?;
-        let models_resp: OpenAiModelsResponse = resp.json().map_err(|e| format!("Parse error: {}", e))?;
+        let models_resp: OpenAiModelsResponse =
+            resp.json().map_err(|e| format!("Parse error: {}", e))?;
 
-        Ok(models_resp.data.iter().map(|m| ModelDescriptor {
-            id: m.id.clone(),
-            name: m.id.clone(),
-            context_length: None,
-        }).collect())
+        Ok(models_resp
+            .data
+            .iter()
+            .map(|m| ModelDescriptor {
+                id: m.id.clone(),
+                name: m.id.clone(),
+                context_length: None,
+                supports_tools: false,
+                supports_vision: false,
+            })
+            .collect())
     }
 }
 
@@ -360,15 +402,25 @@ impl IntelligenceProvider for OpenAiCompatibleProvider {
 pub struct EchoMockProvider;
 
 impl EchoMockProvider {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 impl IntelligenceProvider for EchoMockProvider {
     fn generate(&self, request: &GenerationRequest) -> Result<GenerationResponse, String> {
         Ok(GenerationResponse {
-            content: format!("[Mock] Processed {} prompt: {}...", format!("{:?}", request.mode), &request.user_prompt[..request.user_prompt.len().min(80)]),
+            content: format!(
+                "[Mock] Processed {} prompt: {}...",
+                format!("{:?}", request.mode),
+                &request.user_prompt[..request.user_prompt.len().min(80)]
+            ),
             finish_reason: Some("stop".to_string()),
-            token_usage: Some(TokenUsage { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 }),
+            token_usage: Some(TokenUsage {
+                prompt_tokens: 10,
+                completion_tokens: 20,
+                total_tokens: 30,
+            }),
         })
     }
 
@@ -382,18 +434,35 @@ impl IntelligenceProvider for EchoMockProvider {
     }
 
     fn list_models(&self) -> Result<Vec<ModelDescriptor>, String> {
-        Ok(vec![ModelDescriptor { id: "echo-mock".to_string(), name: "Echo Mock".to_string(), context_length: Some(4096) }])
+        Ok(vec![ModelDescriptor {
+            id: "echo-mock".to_string(),
+            name: "Echo Mock".to_string(),
+            context_length: Some(4096),
+            supports_tools: true,
+            supports_vision: false,
+        }])
     }
 }
 
 // ===== PROVIDER FACTORY =====
 
-pub fn create_provider(config: &ProviderConfig, api_key: Option<&str>) -> Box<dyn IntelligenceProvider> {
+pub fn create_provider(
+    config: &ProviderConfig,
+    api_key: Option<&str>,
+) -> Box<dyn IntelligenceProvider> {
     match config.kind {
         ProviderKind::Ollama => Box::new(OllamaProvider::new(&config.base_url, &config.model_id)),
-        ProviderKind::OpenaiCompatible | ProviderKind::OpenAi => {
-            Box::new(OpenAiCompatibleProvider::new(&config.base_url, &config.model_id, api_key.map(|s| s.to_string())))
-        }
+        ProviderKind::Mock => Box::new(EchoMockProvider::new()),
+        ProviderKind::OpenaiCompatible
+        | ProviderKind::OpenAi
+        | ProviderKind::Anthropic
+        | ProviderKind::Gemini
+        | ProviderKind::Bedrock
+        | ProviderKind::Vertex => Box::new(OpenAiCompatibleProvider::new(
+            &config.base_url,
+            &config.model_id,
+            api_key.map(|s| s.to_string()),
+        )),
     }
 }
 
@@ -427,7 +496,10 @@ impl ModelProvider for LiveProvider {
         let request = GenerationRequest {
             mode: GenerationMode::PlanGeneration,
             system_prompt: crate::prompts::PLAN_SYSTEM_PROMPT.to_string(),
-            user_prompt: format!("Task intent: {}\nWorkspace: {}\nRecent files: {:?}", context.intent, context.workspace_path, context.recent_files),
+            user_prompt: format!(
+                "Task intent: {}\nWorkspace: {}\nRecent files: {:?}",
+                context.intent, context.workspace_path, context.recent_files
+            ),
             max_tokens: Some(4096),
             temperature: Some(0.3),
         };
@@ -444,7 +516,10 @@ impl ModelProvider for LiveProvider {
                         id: uuid::Uuid::new_v4().to_string(),
                         task_id: "live_task".to_string(),
                         status: codra_protocol::PlanStatus::Draft,
-                        title: format!("Plan for: {}", &context.intent[..context.intent.len().min(60)]),
+                        title: format!(
+                            "Plan for: {}",
+                            &context.intent[..context.intent.len().min(60)]
+                        ),
                         objective: context.intent.clone(),
                         steps: vec![
                             codra_protocol::PlanStep {
@@ -460,13 +535,17 @@ impl ModelProvider for LiveProvider {
                                 id: "step_2".to_string(),
                                 kind: codra_protocol::PlanStepKind::Edit,
                                 title: "Implement changes".to_string(),
-                                objective: response.content[..response.content.len().min(200)].to_string(),
+                                objective: response.content[..response.content.len().min(200)]
+                                    .to_string(),
                                 status: codra_protocol::PlanStepStatus::Pending,
                                 files_likely_involved: vec!["src/main.rs".to_string()],
                                 required_tools: vec!["fs_write".to_string()],
                             },
                         ],
-                        dependencies: vec![codra_protocol::PlanDependency { step_id: "step_2".to_string(), depends_on: "step_1".to_string() }],
+                        dependencies: vec![codra_protocol::PlanDependency {
+                            step_id: "step_2".to_string(),
+                            depends_on: "step_1".to_string(),
+                        }],
                         assumptions: vec![],
                         risks: vec![],
                         architecture_proposal: None,
@@ -480,7 +559,11 @@ impl ModelProvider for LiveProvider {
         let request = GenerationRequest {
             mode: GenerationMode::ArchitectureGeneration,
             system_prompt: crate::prompts::ARCHITECTURE_SYSTEM_PROMPT.to_string(),
-            user_prompt: format!("Plan objective: {}\nSteps: {:?}", plan.objective, plan.steps.iter().map(|s| &s.title).collect::<Vec<_>>()),
+            user_prompt: format!(
+                "Plan objective: {}\nSteps: {:?}",
+                plan.objective,
+                plan.steps.iter().map(|s| &s.title).collect::<Vec<_>>()
+            ),
             max_tokens: Some(2048),
             temperature: Some(0.3),
         };
@@ -503,7 +586,10 @@ impl ExecutionProvider for LiveProvider {
         let request = GenerationRequest {
             mode: GenerationMode::StepRefinement,
             system_prompt: crate::prompts::STEP_REFINEMENT_SYSTEM_PROMPT.to_string(),
-            user_prompt: format!("Step title: {}\nObjective: {}\nTools available: {:?}\nFiles involved: {:?}", step.title, step.objective, step.required_tools, step.files_likely_involved),
+            user_prompt: format!(
+                "Step title: {}\nObjective: {}\nTools available: {:?}\nFiles involved: {:?}",
+                step.title, step.objective, step.required_tools, step.files_likely_involved
+            ),
             max_tokens: Some(1024),
             temperature: Some(0.2),
         };
@@ -519,18 +605,29 @@ impl ExecutionProvider for LiveProvider {
 
         Ok(ActionIntent {
             kind,
-            target: step.files_likely_involved.first().cloned().unwrap_or_else(|| "src".to_string()),
+            target: step
+                .files_likely_involved
+                .first()
+                .cloned()
+                .unwrap_or_else(|| "src".to_string()),
             reason: response.content[..response.content.len().min(200)].to_string(),
         })
     }
 }
 
 impl VerificationProvider for LiveProvider {
-    fn parse_outputs(&self, check: &VerificationCheck, raw_stdout: &str) -> (Vec<VerificationFinding>, String) {
+    fn parse_outputs(
+        &self,
+        check: &VerificationCheck,
+        raw_stdout: &str,
+    ) -> (Vec<VerificationFinding>, String) {
         let request = GenerationRequest {
             mode: GenerationMode::VerificationAnalysis,
             system_prompt: crate::prompts::VERIFICATION_SYSTEM_PROMPT.to_string(),
-            user_prompt: format!("Command: {} {:?}\nOutput:\n{}", check.command, check.args, raw_stdout),
+            user_prompt: format!(
+                "Command: {} {:?}\nOutput:\n{}",
+                check.command, check.args, raw_stdout
+            ),
             max_tokens: Some(1024),
             temperature: Some(0.1),
         };
@@ -579,15 +676,42 @@ impl ModelProvider for EchoMockProvider {
             title: "Generated Mock Plan".to_string(),
             objective: context.intent.clone(),
             steps: vec![
-                codra_protocol::PlanStep { id: "step_1".to_string(), kind: codra_protocol::PlanStepKind::Inspect, title: "Inspect Workspace".to_string(), objective: "Verify current state matches assumptions.".to_string(), status: codra_protocol::PlanStepStatus::Pending, files_likely_involved: vec![], required_tools: vec!["fs_list".to_string()] },
-                codra_protocol::PlanStep { id: "step_2".to_string(), kind: codra_protocol::PlanStepKind::Edit, title: "Implement requested feature".to_string(), objective: "Apply code changes according to architecture.".to_string(), status: codra_protocol::PlanStepStatus::Pending, files_likely_involved: vec!["src/main.rs".to_string()], required_tools: vec!["fs_write".to_string()] },
+                codra_protocol::PlanStep {
+                    id: "step_1".to_string(),
+                    kind: codra_protocol::PlanStepKind::Inspect,
+                    title: "Inspect Workspace".to_string(),
+                    objective: "Verify current state matches assumptions.".to_string(),
+                    status: codra_protocol::PlanStepStatus::Pending,
+                    files_likely_involved: vec![],
+                    required_tools: vec!["fs_list".to_string()],
+                },
+                codra_protocol::PlanStep {
+                    id: "step_2".to_string(),
+                    kind: codra_protocol::PlanStepKind::Edit,
+                    title: "Implement requested feature".to_string(),
+                    objective: "Apply code changes according to architecture.".to_string(),
+                    status: codra_protocol::PlanStepStatus::Pending,
+                    files_likely_involved: vec!["src/main.rs".to_string()],
+                    required_tools: vec!["fs_write".to_string()],
+                },
             ],
-            dependencies: vec![codra_protocol::PlanDependency { step_id: "step_2".to_string(), depends_on: "step_1".to_string() }],
-            assumptions: vec![codra_protocol::AssumptionItem { description: "Rust toolchain is installed.".to_string(), confidence: "high".to_string() }],
-            risks: vec![codra_protocol::RiskItem { description: "File lock might exist.".to_string(), severity: "low".to_string() }],
+            dependencies: vec![codra_protocol::PlanDependency {
+                step_id: "step_2".to_string(),
+                depends_on: "step_1".to_string(),
+            }],
+            assumptions: vec![codra_protocol::AssumptionItem {
+                description: "Rust toolchain is installed.".to_string(),
+                confidence: "high".to_string(),
+            }],
+            risks: vec![codra_protocol::RiskItem {
+                description: "File lock might exist.".to_string(),
+                severity: "low".to_string(),
+            }],
             architecture_proposal: None,
         };
-        if needs_arch { plan.architecture_proposal = Some(self.generate_architecture(&plan)?); }
+        if needs_arch {
+            plan.architecture_proposal = Some(self.generate_architecture(&plan)?);
+        }
         Ok(PlannerOutput { plan })
     }
 
@@ -610,16 +734,28 @@ impl ExecutionProvider for EchoMockProvider {
         } else {
             (ActionKind::InspectFiles, "src".to_string())
         };
-        Ok(ActionIntent { kind, target, reason: format!("Executing strategy for objective: {}", step.objective) })
+        Ok(ActionIntent {
+            kind,
+            target,
+            reason: format!("Executing strategy for objective: {}", step.objective),
+        })
     }
 }
 
 impl VerificationProvider for EchoMockProvider {
-    fn parse_outputs(&self, check: &VerificationCheck, _raw_stdout: &str) -> (Vec<VerificationFinding>, String) {
+    fn parse_outputs(
+        &self,
+        check: &VerificationCheck,
+        _raw_stdout: &str,
+    ) -> (Vec<VerificationFinding>, String) {
         let simulated_out = format!("Running {} {:?}...\nerror[E0308]: mismatched types\n --> src/main.rs:12:5\n  = note: expected struct `PatchProposalStatus`\n", check.command, check.args);
         let finding = VerificationFinding {
-            id: "find_1".to_string(), severity: VerificationSeverity::Critical, classification: FailureClassification::TypeError,
-            message: "Mismatched types: Expected Status enum but got String in patch state.".to_string(), affected_files: vec!["src/main.rs".to_string()],
+            id: "find_1".to_string(),
+            severity: VerificationSeverity::Critical,
+            classification: FailureClassification::TypeError,
+            message: "Mismatched types: Expected Status enum but got String in patch state."
+                .to_string(),
+            affected_files: vec!["src/main.rs".to_string()],
         };
         (vec![finding], simulated_out)
     }

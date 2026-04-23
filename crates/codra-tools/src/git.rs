@@ -1,6 +1,6 @@
-use std::process::Command;
-use codra_protocol::{GitStatusSummary};
+use codra_protocol::GitStatusSummary;
 use std::path::PathBuf;
+use std::process::Command;
 
 pub struct LocalGit {
     root_path: PathBuf,
@@ -9,7 +9,7 @@ pub struct LocalGit {
 impl LocalGit {
     pub fn new(root: impl Into<PathBuf>) -> Self {
         Self {
-            root_path: root.into()
+            root_path: root.into(),
         }
     }
 
@@ -26,12 +26,12 @@ impl LocalGit {
                 return Ok(GitStatusSummary {
                     is_git: false,
                     branch: None,
-                    changed_files: 0
+                    changed_files: 0,
                 });
             }
             let stdout = String::from_utf8_lossy(&out.stdout);
             let mut lines = stdout.lines();
-            
+
             let mut branch = None;
             if let Some(first_line) = lines.next() {
                 if first_line.starts_with("##") {
@@ -45,13 +45,13 @@ impl LocalGit {
             Ok(GitStatusSummary {
                 is_git: true,
                 branch,
-                changed_files
+                changed_files,
             })
         } else {
             Ok(GitStatusSummary {
                 is_git: false,
                 branch: None,
-                changed_files: 0
+                changed_files: 0,
             })
         }
     }

@@ -1,10 +1,10 @@
-use headless_chrome::{Browser, LaunchOptions, Tab};
-use std::sync::Arc;
-use codra_protocol::*;
-use std::path::PathBuf;
-use std::fs;
+use base64::{engine::general_purpose, Engine as _};
 use chrono::Utc;
-use base64::{Engine as _, engine::general_purpose};
+use codra_protocol::*;
+use headless_chrome::{Browser, LaunchOptions, Tab};
+use std::fs;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 pub struct BrowserSession {
     _browser: Browser,
@@ -19,10 +19,11 @@ impl BrowserSession {
             .build()
             .map_err(|e| format!("Failed to build launch options: {}", e))?;
 
-        let browser = Browser::new(options)
-            .map_err(|e| format!("Failed to launch browser: {}", e))?;
+        let browser =
+            Browser::new(options).map_err(|e| format!("Failed to launch browser: {}", e))?;
 
-        let active_tab = browser.new_tab()
+        let active_tab = browser
+            .new_tab()
             .map_err(|e| format!("Failed to create initial tab: {}", e))?;
 
         // Ensure artifact directory exists
@@ -38,12 +39,19 @@ impl BrowserSession {
         })
     }
 
-    pub fn execute_action(&self, request: &BrowserActionRequest) -> Result<BrowserActionResult, String> {
+    pub fn execute_action(
+        &self,
+        request: &BrowserActionRequest,
+    ) -> Result<BrowserActionResult, String> {
         match request.kind {
             BrowserActionKind::OpenUrl => self.navigate(&request.value, &request.id),
             BrowserActionKind::CaptureScreenshot => self.screenshot(&request.id),
             BrowserActionKind::ClickSelector => self.click(&request.value, &request.id),
-            BrowserActionKind::TypeSelector => self.type_text(&request.value, request.text_input.as_deref().unwrap_or(""), &request.id),
+            BrowserActionKind::TypeSelector => self.type_text(
+                &request.value,
+                request.text_input.as_deref().unwrap_or(""),
+                &request.id,
+            ),
             BrowserActionKind::WaitForSelector => self.wait_for(&request.value, &request.id),
             BrowserActionKind::ExtractText => self.extract(&request.value, &request.id),
             BrowserActionKind::GetPageState => self.get_state(&request.id),
@@ -51,10 +59,12 @@ impl BrowserSession {
     }
 
     fn navigate(&self, url: &str, action_id: &str) -> Result<BrowserActionResult, String> {
-        self.active_tab.navigate_to(url)
+        self.active_tab
+            .navigate_to(url)
             .map_err(|e| e.to_string())?;
-        
-        self.active_tab.wait_until_navigated()
+
+        self.active_tab
+            .wait_until_navigated()
             .map_err(|e| e.to_string())?;
 
         Ok(BrowserActionResult {
@@ -67,12 +77,15 @@ impl BrowserSession {
     }
 
     fn screenshot(&self, action_id: &str) -> Result<BrowserActionResult, String> {
-        let png_data = self.active_tab.capture_screenshot(
-            headless_chrome::protocol::cdp::Page::CaptureScreenshotFormatOption::Png,
-            None,
-            None,
-            true
-        ).map_err(|e| e.to_string())?;
+        let png_data = self
+            .active_tab
+            .capture_screenshot(
+                headless_chrome::protocol::cdp::Page::CaptureScreenshotFormatOption::Png,
+                None,
+                None,
+                true,
+            )
+            .map_err(|e| e.to_string())?;
 
         let filename = format!("screenshot_{}_{}.png", action_id, Utc::now().timestamp());
         let relative_path = format!(".codra/browser/artifacts/{}", filename);
@@ -92,11 +105,12 @@ impl BrowserSession {
     }
 
     fn click(&self, selector: &str, action_id: &str) -> Result<BrowserActionResult, String> {
-        let element = self.active_tab.wait_for_element(selector)
+        let element = self
+            .active_tab
+            .wait_for_element(selector)
             .map_err(|e| format!("Selector '{}' not found: {}", selector, e))?;
-        
-        element.click()
-            .map_err(|e| e.to_string())?;
+
+        element.click().map_err(|e| e.to_string())?;
 
         Ok(BrowserActionResult {
             action_id: action_id.to_string(),
@@ -107,15 +121,20 @@ impl BrowserSession {
         })
     }
 
-    fn type_text(&self, selector: &str, text: &str, action_id: &str) -> Result<BrowserActionResult, String> {
-        let element = self.active_tab.wait_for_element(selector)
+    fn type_text(
+        &self,
+        selector: &str,
+        text: &str,
+        action_id: &str,
+    ) -> Result<BrowserActionResult, String> {
+        let element = self
+            .active_tab
+            .wait_for_element(selector)
             .map_err(|e| format!("Selector '{}' not found: {}", selector, e))?;
-        
-        element.click()
-            .map_err(|e| e.to_string())?;
 
-        self.active_tab.type_str(text)
-            .map_err(|e| e.to_string())?;
+        element.click().map_err(|e| e.to_string())?;
+
+        self.active_tab.type_str(text).map_err(|e| e.to_string())?;
 
         Ok(BrowserActionResult {
             action_id: action_id.to_string(),
@@ -127,7 +146,8 @@ impl BrowserSession {
     }
 
     fn wait_for(&self, selector: &str, action_id: &str) -> Result<BrowserActionResult, String> {
-        self.active_tab.wait_for_element(selector)
+        self.active_tab
+            .wait_for_element(selector)
             .map_err(|e| e.to_string())?;
 
         Ok(BrowserActionResult {
@@ -140,11 +160,12 @@ impl BrowserSession {
     }
 
     fn extract(&self, selector: &str, action_id: &str) -> Result<BrowserActionResult, String> {
-        let element = self.active_tab.wait_for_element(selector)
+        let element = self
+            .active_tab
+            .wait_for_element(selector)
             .map_err(|e| e.to_string())?;
-        
-        let text = element.get_inner_text()
-            .map_err(|e| e.to_string())?;
+
+        let text = element.get_inner_text().map_err(|e| e.to_string())?;
 
         Ok(BrowserActionResult {
             action_id: action_id.to_string(),
@@ -176,6 +197,8 @@ impl BrowserSession {
                 title: self.active_tab.get_title().unwrap_or_default(),
             }),
             last_error: None,
+            artifacts: vec![],
+            event_log: vec![],
         }
     }
 }

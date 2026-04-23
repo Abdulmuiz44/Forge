@@ -1,0 +1,14 @@
+[package]
+name = "codra-cli"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "codra"
+path = "src/main.rs"
+
+[dependencies]
+serde_json.workspace = true
+codra-core = { path = "../codra-core" }
+codra-protocol = { path = "../codra-protocol" }
+codra-tools = { path = "../codra-tools" }

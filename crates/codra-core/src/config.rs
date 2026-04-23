@@ -1,6 +1,6 @@
-use serde::{Serialize, Deserialize};
-use std::path::PathBuf;
+use serde::{Deserialize, Serialize};
 use std::fs;
+use std::path::PathBuf;
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct GlobalConfig {
@@ -13,8 +13,11 @@ pub struct GlobalConfigService {
 
 impl GlobalConfigService {
     pub fn new(app_data_dir: PathBuf) -> Self {
-        let config_path = app_data_dir.join("config.json");
-        let _ = fs::create_dir_all(&app_data_dir);
+        let global_dir = std::env::var("USERPROFILE")
+            .map(|home| PathBuf::from(home).join(".codra"))
+            .unwrap_or_else(|_| app_data_dir.join("codra-global"));
+        let _ = fs::create_dir_all(&global_dir);
+        let config_path = global_dir.join("config.json");
         Self { config_path }
     }
 

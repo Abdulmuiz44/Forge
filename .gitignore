@@ -20,12 +20,6 @@ src-tauri/gen/android
 .codra/verifications/*.json
 .codra/provider_secret.key
 
-# Legacy Forge internal (read-only migration compatibility)
-.forge/plans/*.json
-.forge/executions/*.log
-.forge/verifications/*.json
-.forge/provider_secret.key
-
 # IDE
 .vscode/
 .idea/
