@@ -1,6 +1,6 @@
 use codra_protocol::{DeployPrepSummary, DeployTargetKind};
-use std::path::PathBuf;
 use std::fs;
+use std::path::PathBuf;
 use uuid::Uuid;
 
 pub struct DeployPrepService {

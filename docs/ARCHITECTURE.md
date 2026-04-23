@@ -44,4 +44,3 @@ Responsible for launching targets, injecting JavaScript listeners, extracting DO
 ## Storage Extensibility
 - **Checkpoints**: Written to `.codra/checkpoints` securely.
 - **Metadata**: Indexed into `~/.codra-agent/data.sqlite`.
-- **Migration Compatibility**: Runtime reads legacy `.forge` workspace data when `.codra` data is not yet present.

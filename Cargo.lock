@@ -365,6 +365,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "codra-cli"
+version = "0.1.0"
+dependencies = [
+ "codra-core",
+ "codra-protocol",
+ "codra-tools",
+ "serde_json",
+]
+
+[[package]]
 name = "codra-core"
 version = "0.1.0"
 dependencies = [

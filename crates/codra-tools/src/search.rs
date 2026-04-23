@@ -1,8 +1,8 @@
-use codra_protocol::{SearchQuery, SearchMatch};
+use codra_protocol::{SearchMatch, SearchQuery};
 use ignore::WalkBuilder;
 use regex::Regex;
-use std::path::PathBuf;
 use std::fs;
+use std::path::PathBuf;
 
 pub struct LocalSearch {
     root_path: PathBuf,
@@ -11,16 +11,16 @@ pub struct LocalSearch {
 impl LocalSearch {
     pub fn new(root: impl Into<PathBuf>) -> Self {
         Self {
-            root_path: root.into()
+            root_path: root.into(),
         }
     }
 
     pub fn execute_search(&self, query: SearchQuery) -> Result<Vec<SearchMatch>, String> {
         let re = Regex::new(&query.pattern).map_err(|e| e.to_string())?;
-        
+
         let target_dir = match query.directory {
             Some(d) => self.root_path.join(d),
-            None => self.root_path.clone()
+            None => self.root_path.clone(),
         };
 
         let mut matches = Vec::new();
@@ -41,7 +41,9 @@ impl LocalSearch {
                                     // Make safe preview
                                     let preview = line.chars().take(200).collect::<String>();
                                     // Adjust path relative to root if possible
-                                    let rel_path = entry.path().strip_prefix(&self.root_path)
+                                    let rel_path = entry
+                                        .path()
+                                        .strip_prefix(&self.root_path)
                                         .unwrap_or(entry.path())
                                         .to_string_lossy()
                                         .to_string();
@@ -49,11 +51,13 @@ impl LocalSearch {
                                     matches.push(SearchMatch {
                                         path: rel_path,
                                         line_number: line_idx + 1,
-                                        preview
+                                        preview,
                                     });
 
                                     // Cap matches per file simply for safety initially
-                                    if matches.len() > 100 { break; }
+                                    if matches.len() > 100 {
+                                        break;
+                                    }
                                 }
                             }
                         }

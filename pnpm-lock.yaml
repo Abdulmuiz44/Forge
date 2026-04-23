@@ -10,10 +10,10 @@ importers:
 
   apps/desktop:
     dependencies:
-      '@forge/shared':
+      '@codra/shared':
         specifier: workspace:*
         version: link:../../packages/shared
-      '@forge/ui':
+      '@codra/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       '@tauri-apps/api':

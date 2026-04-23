@@ -24,7 +24,10 @@ impl LocalBrowserService {
         Ok(())
     }
 
-    pub fn execute_action(&self, request: &BrowserActionRequest) -> Result<BrowserActionResult, String> {
+    pub fn execute_action(
+        &self,
+        request: &BrowserActionRequest,
+    ) -> Result<BrowserActionResult, String> {
         if let Some(ref session) = self.session {
             session.execute_action(request)
         } else {
@@ -40,6 +43,8 @@ impl LocalBrowserService {
                 status: BrowserSessionStatus::Disconnected,
                 current_target: None,
                 last_error: None,
+                artifacts: vec![],
+                event_log: vec![],
             }
         }
     }

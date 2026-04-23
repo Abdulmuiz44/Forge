@@ -2,144 +2,364 @@ use serde::{Deserialize, Serialize};
 
 // --- PREVIOUS SHARED TYPES ---
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct TaskMode { pub is_autonomous: bool }
+pub struct TaskMode {
+    pub is_autonomous: bool,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum ApprovalState { Pending, Approved, Rejected }
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct WorkspaceSummary { pub id: String, pub root_path: String }
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct RepoSummary { pub workspace_id: String, pub name: String }
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct GitStatusSummary { pub is_git: bool, pub branch: Option<String>, pub changed_files: usize }
+pub enum ApprovalState {
+    Pending,
+    Approved,
+    Rejected,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct SearchQuery { pub pattern: String, pub directory: Option<String> }
+pub struct WorkspaceSummary {
+    pub id: String,
+    pub root_path: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum SafetyMode {
+    ReadOnly,
+    WorkspaceWrite,
+    DangerFullAccess,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum RuntimeMode {
+    Balanced,
+    LocalOnly,
+    CloudAssisted,
+    ResearchHeavy,
+    BrowserHeavy,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum TimelineSource {
+    System,
+    Planner,
+    Executor,
+    Verifier,
+    Repair,
+    Provider,
+    Tool,
+    Browser,
+    ComputerUse,
+    Research,
+    Deploy,
+    Design,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct SearchMatch { pub path: String, pub line_number: usize, pub preview: String }
+pub struct TimelineEvent {
+    pub id: String,
+    pub timestamp: String,
+    pub source: TimelineSource,
+    pub title: String,
+    pub message: String,
+    pub status: String,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct FileReadResult { pub content: String }
+pub struct RepoSummary {
+    pub workspace_id: String,
+    pub name: String,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct FileWriteRequest { pub path: String, pub content: String }
+pub struct GitStatusSummary {
+    pub is_git: bool,
+    pub branch: Option<String>,
+    pub changed_files: usize,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct FileWriteResult { pub success: bool, pub checkpoint_id: Option<String>, pub error: Option<String> }
+pub struct SearchQuery {
+    pub pattern: String,
+    pub directory: Option<String>,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandExecutionRequest { pub command: String, pub args: Vec<String> }
+pub struct SearchMatch {
+    pub path: String,
+    pub line_number: usize,
+    pub preview: String,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct CommandExecutionResult { pub stdout: String, pub stderr: String, pub exit_code: i32 }
+pub struct FileReadResult {
+    pub content: String,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct CheckpointRecord { pub id: String, pub workspace_id: String, pub timestamp: String, pub target_path: String, pub operation_type: String, pub status: String }
+pub struct FileWriteRequest {
+    pub path: String,
+    pub content: String,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct ApprovalRequirement { pub id: String, pub action_type: String, pub description: String }
+pub struct FileWriteResult {
+    pub success: bool,
+    pub checkpoint_id: Option<String>,
+    pub error: Option<String>,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct ApprovalDecision { pub requirement_id: String, pub approved: bool }
+pub struct CommandExecutionRequest {
+    pub command: String,
+    pub args: Vec<String>,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct FileEntry { pub name: String, pub path: String, pub is_directory: bool }
+pub struct CommandExecutionResult {
+    pub stdout: String,
+    pub stderr: String,
+    pub exit_code: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CheckpointRecord {
+    pub id: String,
+    pub workspace_id: String,
+    pub timestamp: String,
+    pub target_path: String,
+    pub operation_type: String,
+    pub status: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ApprovalRequirement {
+    pub id: String,
+    pub action_type: String,
+    pub description: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ApprovalDecision {
+    pub requirement_id: String,
+    pub approved: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct FileEntry {
+    pub name: String,
+    pub path: String,
+    pub is_directory: bool,
+}
 
 // --- PLANNER SHARED TYPES ---
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum PlanStatus { Draft, ReadyForReview, Approved, Rejected, Superseded, Archived }
+pub enum PlanStatus {
+    Draft,
+    ReadyForReview,
+    Approved,
+    Rejected,
+    Superseded,
+    Archived,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum PlanningMode { Auto, Interactive }
+pub enum PlanningMode {
+    Auto,
+    Interactive,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum PlanStepStatus { Pending, Running, Completed, Failed }
+pub enum PlanStepStatus {
+    Pending,
+    Running,
+    Completed,
+    Failed,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum PlanStepKind { Inspect, Search, Edit, RunCommand, Verify, GitReview, BrowserTask, DeployPrep, DocUpdate, ManualInput }
+pub enum PlanStepKind {
+    Inspect,
+    Search,
+    Edit,
+    RunCommand,
+    Verify,
+    GitReview,
+    BrowserTask,
+    DeployPrep,
+    DocUpdate,
+    ManualInput,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct TaskRequest { pub id: String, pub intent: String, pub mode: PlanningMode }
+pub struct TaskRequest {
+    pub id: String,
+    pub intent: String,
+    pub mode: PlanningMode,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct TaskContext { pub workspace_id: String, pub workspace_path: String, pub intent: String, pub recent_searches: Vec<String>, pub recent_files: Vec<String> }
+pub struct TaskContext {
+    pub workspace_id: String,
+    pub workspace_path: String,
+    pub intent: String,
+    pub recent_searches: Vec<String>,
+    pub recent_files: Vec<String>,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct RiskItem { pub description: String, pub severity: String }
+pub struct RiskItem {
+    pub description: String,
+    pub severity: String,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct AssumptionItem { pub description: String, pub confidence: String }
+pub struct AssumptionItem {
+    pub description: String,
+    pub confidence: String,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct PlanDependency { pub step_id: String, pub depends_on: String }
+pub struct PlanDependency {
+    pub step_id: String,
+    pub depends_on: String,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct PlanStep { pub id: String, pub kind: PlanStepKind, pub title: String, pub objective: String, pub status: PlanStepStatus, pub files_likely_involved: Vec<String>, pub required_tools: Vec<String> }
+pub struct PlanStep {
+    pub id: String,
+    pub kind: PlanStepKind,
+    pub title: String,
+    pub objective: String,
+    pub status: PlanStepStatus,
+    pub files_likely_involved: Vec<String>,
+    pub required_tools: Vec<String>,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct ArchitectureProposal { pub id: String, pub rationale: String, pub success_criteria: Vec<String>, pub estimated_impact: String, pub tradeoffs: Vec<String>, pub touched_subsystems: Vec<String> }
+pub struct ArchitectureProposal {
+    pub id: String,
+    pub rationale: String,
+    pub success_criteria: Vec<String>,
+    pub estimated_impact: String,
+    pub tradeoffs: Vec<String>,
+    pub touched_subsystems: Vec<String>,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct ExecutionPlan { pub id: String, pub task_id: String, pub status: PlanStatus, pub title: String, pub objective: String, pub steps: Vec<PlanStep>, pub dependencies: Vec<PlanDependency>, pub assumptions: Vec<AssumptionItem>, pub risks: Vec<RiskItem>, pub architecture_proposal: Option<ArchitectureProposal> }
+pub struct ExecutionPlan {
+    pub id: String,
+    pub task_id: String,
+    pub status: PlanStatus,
+    pub title: String,
+    pub objective: String,
+    pub steps: Vec<PlanStep>,
+    pub dependencies: Vec<PlanDependency>,
+    pub assumptions: Vec<AssumptionItem>,
+    pub risks: Vec<RiskItem>,
+    pub architecture_proposal: Option<ArchitectureProposal>,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct PlannerOutput { pub plan: ExecutionPlan }
+pub struct PlannerOutput {
+    pub plan: ExecutionPlan,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct PlannerDecision { pub requires_architecture: bool, pub reason: String }
+pub struct PlannerDecision {
+    pub requires_architecture: bool,
+    pub reason: String,
+}
 
 // --- EXECUTOR SHARED TYPES ---
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum ExecutionStatus { Pending, Ready, Running, WaitingForApproval, Paused, Blocked, Failed, Completed, Cancelled }
+pub enum ExecutionStatus {
+    Pending,
+    Ready,
+    Running,
+    WaitingForApproval,
+    Paused,
+    Blocked,
+    Failed,
+    Completed,
+    Cancelled,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum ExecutionMode { StepByStep, Autonomous }
+pub enum ExecutionMode {
+    StepByStep,
+    Autonomous,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum StepExecutionStatus { NotStarted, ContextReady, ActionSelected, Running, AwaitingPatchReview, AwaitingApproval, Applied, Verified, Failed, Skipped }
+pub enum StepExecutionStatus {
+    NotStarted,
+    ContextReady,
+    ActionSelected,
+    Running,
+    AwaitingPatchReview,
+    AwaitingApproval,
+    Applied,
+    Verified,
+    Failed,
+    Skipped,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum ActionKind { InspectFiles, SearchRepo, ReadFile, ProposeEdit, ApplyEdit, RunCommand, UpdateDocs, GitReview, PrepareVerify }
+pub enum ActionKind {
+    InspectFiles,
+    SearchRepo,
+    ReadFile,
+    ProposeEdit,
+    ApplyEdit,
+    RunCommand,
+    UpdateDocs,
+    GitReview,
+    PrepareVerify,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum PatchProposalStatus { Draft, ReadyForReview, Approved, Rejected, Applied, Superseded }
+pub enum PatchProposalStatus {
+    Draft,
+    ReadyForReview,
+    Approved,
+    Rejected,
+    Applied,
+    Superseded,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -190,19 +410,50 @@ pub struct ActionIntent {
 // --- VERIFIER SHARED TYPES ---
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum VerificationStatus { Pending, Ready, Running, Passed, Failed, Inconclusive, Blocked, Cancelled }
+pub enum VerificationStatus {
+    Pending,
+    Ready,
+    Running,
+    Passed,
+    Failed,
+    Inconclusive,
+    Blocked,
+    Cancelled,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum VerificationCheckKind { TestCommand, LintCommand, TypecheckCommand, BuildCommand, FormattingCheck, CustomCommand }
+pub enum VerificationCheckKind {
+    TestCommand,
+    LintCommand,
+    TypecheckCommand,
+    BuildCommand,
+    FormattingCheck,
+    CustomCommand,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum VerificationSeverity { Low, Medium, Critical, Fatal }
+pub enum VerificationSeverity {
+    Low,
+    Medium,
+    Critical,
+    Fatal,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum FailureClassification { TestFailure, LintFailure, TypeError, BuildError, MissingDependency, EnvironmentIssue, CommandFailure, Timeout, Unknown }
+pub enum FailureClassification {
+    TestFailure,
+    LintFailure,
+    TypeError,
+    BuildError,
+    MissingDependency,
+    EnvironmentIssue,
+    CommandFailure,
+    Timeout,
+    Unknown,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -260,11 +511,26 @@ pub struct VerificationState {
 // --- INTEGRATION SHARED TYPES ---
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum RepairAttemptStatus { Pending, Running, AwaitingApproval, Applied, Verifying, Failed, Exhausted, Completed }
+pub enum RepairAttemptStatus {
+    Pending,
+    Running,
+    AwaitingApproval,
+    Applied,
+    Verifying,
+    Failed,
+    Exhausted,
+    Completed,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum DeployTargetKind { NodeWebApp, StaticSite, TauriDesktop, RustService, Unknown }
+pub enum DeployTargetKind {
+    NodeWebApp,
+    StaticSite,
+    TauriDesktop,
+    RustService,
+    Unknown,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -362,6 +628,10 @@ pub struct BrowserSessionState {
     pub status: BrowserSessionStatus,
     pub current_target: Option<BrowserTargetInfo>,
     pub last_error: Option<String>,
+    #[serde(default)]
+    pub artifacts: Vec<BrowserArtifact>,
+    #[serde(default)]
+    pub event_log: Vec<BrowserEventLogEntry>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -385,19 +655,41 @@ pub struct DeployPrepSummary {
     pub risks: Vec<String>,
 }
 
-
 // --- PROVIDER DOMAIN TYPES ---
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum ProviderKind { Ollama, OpenaiCompatible, OpenAi }
+pub enum ProviderKind {
+    Ollama,
+    OpenaiCompatible,
+    OpenAi,
+    Anthropic,
+    Gemini,
+    Bedrock,
+    Vertex,
+    Mock,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum ProviderStatus { Unconfigured, Connecting, Connected, Failed, Degraded }
+pub enum ProviderStatus {
+    Unconfigured,
+    Connecting,
+    Connected,
+    Failed,
+    Degraded,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum GenerationMode { PlanGeneration, ArchitectureGeneration, StepRefinement, PatchRationale, VerificationAnalysis, RepairGeneration, DeployPrepReasoning }
+pub enum GenerationMode {
+    PlanGeneration,
+    ArchitectureGeneration,
+    StepRefinement,
+    PatchRationale,
+    VerificationAnalysis,
+    RepairGeneration,
+    DeployPrepReasoning,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -406,6 +698,30 @@ pub struct ProviderConfig {
     pub base_url: String,
     pub model_id: String,
     pub api_key_set: bool,
+    #[serde(default = "default_profile_id")]
+    pub profile_id: String,
+    #[serde(default = "default_profile_name")]
+    pub profile_name: String,
+}
+
+fn default_profile_id() -> String {
+    "default".to_string()
+}
+fn default_profile_name() -> String {
+    "Default".to_string()
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderProfile {
+    pub id: String,
+    pub name: String,
+    pub config: ProviderConfig,
+    pub runtime_mode: RuntimeMode,
+    pub route_planner_model: Option<String>,
+    pub route_executor_model: Option<String>,
+    pub route_verifier_model: Option<String>,
+    pub route_research_model: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -423,6 +739,10 @@ pub struct ModelDescriptor {
     pub id: String,
     pub name: String,
     pub context_length: Option<i64>,
+    #[serde(default)]
+    pub supports_tools: bool,
+    #[serde(default)]
+    pub supports_vision: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -457,4 +777,162 @@ pub struct AppBootData {
     pub active_plan: Option<ExecutionPlan>,
     pub active_execution: Option<ExecutionState>,
     pub provider_config: Option<ProviderConfig>,
+    #[serde(default)]
+    pub timeline: Vec<TimelineEvent>,
+    pub safety_mode: Option<SafetyMode>,
+    pub runtime_mode: Option<RuntimeMode>,
+    pub recovered_from_legacy: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ToolCategory {
+    Filesystem,
+    Search,
+    Terminal,
+    Git,
+    Planner,
+    Verifier,
+    Browser,
+    ComputerUse,
+    WebResearch,
+    Design,
+    Deploy,
+    Task,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ToolSafetyLevel {
+    ReadOnly,
+    WorkspaceWrite,
+    Destructive,
+    ExternalNetwork,
+    ComputerControl,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ToolDefinition {
+    pub name: String,
+    pub display_name: String,
+    pub description: String,
+    pub category: ToolCategory,
+    pub safety_level: ToolSafetyLevel,
+    pub input_schema: serde_json::Value,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ToolCallRequest {
+    pub id: String,
+    pub tool_name: String,
+    pub arguments: serde_json::Value,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ToolCallResult {
+    pub id: String,
+    pub tool_name: String,
+    pub success: bool,
+    pub output: serde_json::Value,
+    pub approval_required: Option<ApprovalRequirement>,
+    pub timeline_event: Option<TimelineEvent>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct McpServerInfo {
+    pub name: String,
+    pub version: String,
+    pub tools: Vec<ToolDefinition>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillDescriptor {
+    pub name: String,
+    pub path: String,
+    pub description: String,
+    pub enabled: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ComputerUseActionKind {
+    ListApps,
+    GetAppState,
+    PressKey,
+    TypeText,
+    ClickTarget,
+    RunSequence,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ComputerUseAction {
+    pub id: String,
+    pub kind: ComputerUseActionKind,
+    pub target: Option<String>,
+    pub text: Option<String>,
+    pub sequence: Vec<ComputerUseAction>,
+    pub requires_permission: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ComputerUseResult {
+    pub action_id: String,
+    pub success: bool,
+    pub message: String,
+    pub state: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct WebResearchRecord {
+    pub id: String,
+    pub query: String,
+    pub title: String,
+    pub url: String,
+    pub summary: String,
+    pub marked_relevant: bool,
+    pub timestamp: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct DesignToken {
+    pub name: String,
+    pub value: String,
+    pub category: String,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct DesignSystemSummary {
+    pub found: bool,
+    pub path: Option<String>,
+    pub tokens: Vec<DesignToken>,
+    pub rationale: String,
+    pub issues: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CodraShellData {
+    pub workspace: Option<WorkspaceSummary>,
+    pub provider: Option<ProviderConfig>,
+    pub provider_health: Option<ProviderHealthResult>,
+    pub active_plan: Option<ExecutionPlan>,
+    pub active_execution: Option<ExecutionState>,
+    pub tools: Vec<ToolDefinition>,
+    pub timeline: Vec<TimelineEvent>,
+    pub browser: BrowserSessionState,
+    pub research: Vec<WebResearchRecord>,
+    pub design_system: DesignSystemSummary,
+    pub safety_mode: SafetyMode,
+    pub runtime_mode: RuntimeMode,
 }

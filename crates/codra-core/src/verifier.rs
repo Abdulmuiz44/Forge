@@ -1,10 +1,10 @@
-use codra_protocol::{
-    VerificationState, VerificationStatus, VerificationCheck, VerificationCheckKind,
-    RetryRecommendation, RetryRequest
-};
 use crate::provider::VerificationProvider;
-use std::path::PathBuf;
+use codra_protocol::{
+    RetryRecommendation, RetryRequest, VerificationCheck, VerificationCheckKind, VerificationState,
+    VerificationStatus,
+};
 use std::fs;
+use std::path::PathBuf;
 use uuid::Uuid;
 
 pub struct VerifierPersistence {
@@ -13,7 +13,9 @@ pub struct VerifierPersistence {
 
 impl VerifierPersistence {
     pub fn new(workspace_root: &str) -> Self {
-        let dir = PathBuf::from(workspace_root).join(".codra").join("verifications");
+        let dir = PathBuf::from(workspace_root)
+            .join(".codra")
+            .join("verifications");
         let _ = fs::create_dir_all(&dir);
         Self { root_path: dir }
     }
@@ -38,9 +40,13 @@ impl<'a> VerificationService<'a> {
         }
     }
 
-    pub fn start_verification(&self, execution_id: &str, step_id: &str) -> Result<VerificationState, String> {
+    pub fn start_verification(
+        &self,
+        execution_id: &str,
+        step_id: &str,
+    ) -> Result<VerificationState, String> {
         let id = Uuid::new_v4().to_string();
-        
+
         let check = VerificationCheck {
             id: Uuid::new_v4().to_string(),
             kind: VerificationCheckKind::TypecheckCommand,
@@ -60,18 +66,21 @@ impl<'a> VerificationService<'a> {
         };
 
         // Use injected provider for output analysis
-        let (findings, stdout) = self.provider.parse_outputs(&check, "error[E0308]: mismatched types");
-        
+        let (findings, stdout) = self
+            .provider
+            .parse_outputs(&check, "error[E0308]: mismatched types");
+
         state.stdout = stdout;
         state.findings = findings;
 
         if !state.findings.is_empty() {
             state.status = VerificationStatus::Failed;
-            
+
             state.retry_recommendation = Some(RetryRecommendation {
                 reason: "Type signatures diverge in the proposed patch.".to_string(),
                 affected_files: vec!["src/main.rs".to_string()],
-                suggested_action: "Fix the returned ActionIntent shape to match explicitly.".to_string(),
+                suggested_action: "Fix the returned ActionIntent shape to match explicitly."
+                    .to_string(),
                 allow_auto_execution: false,
             });
         } else {
@@ -82,8 +91,13 @@ impl<'a> VerificationService<'a> {
         Ok(state)
     }
 
-    pub fn generate_retry_payload(&self, state: &VerificationState) -> Result<RetryRequest, String> {
-        let recommendation = state.retry_recommendation.as_ref()
+    pub fn generate_retry_payload(
+        &self,
+        state: &VerificationState,
+    ) -> Result<RetryRequest, String> {
+        let recommendation = state
+            .retry_recommendation
+            .as_ref()
             .ok_or_else(|| "No retry recommendation on verified state.".to_string())?;
 
         Ok(RetryRequest {
