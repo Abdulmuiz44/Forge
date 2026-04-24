@@ -54,6 +54,29 @@ type ViewMode = 'home' | 'agent' | 'code' | 'browser' | 'deploy' | 'settings';
 type UtilityTab = 'terminal' | 'logs' | 'activity' | 'timeline';
 type RightTab = 'context' | 'memory';
 
+const DESKTOP_BRIDGE_UNAVAILABLE =
+  'Native desktop bridge unavailable. Open Codra in the Tauri desktop app to run this action.';
+
+class DesktopBridgeUnavailableError extends Error {
+  constructor() {
+    super(DESKTOP_BRIDGE_UNAVAILABLE);
+    this.name = 'DesktopBridgeUnavailableError';
+  }
+}
+
+function hasDesktopBridge() {
+  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+}
+
+function isDesktopBridgeUnavailable(error: unknown) {
+  return error instanceof DesktopBridgeUnavailableError || String(error).includes('reading \'invoke\'') || String(error).includes('reading "invoke"');
+}
+
+function nativeErrorMessage(action: string, error: unknown) {
+  if (isDesktopBridgeUnavailable(error)) return `${action} requires the Codra desktop app.`;
+  return `${action} failed: ${String(error)}`;
+}
+
 const primaryNav = [
   { id: 'home', label: 'Home', icon: Home, items: ['Overview'] },
   { id: 'agent', label: 'Agent', icon: Bot, items: ['New Task', 'Tasks'] },
@@ -131,9 +154,14 @@ function App() {
     void boot();
   }, []);
 
+  async function invokeNative<T>(command: string, args?: Record<string, unknown>) {
+    if (!hasDesktopBridge()) throw new DesktopBridgeUnavailableError();
+    return invoke<T>(command, args);
+  }
+
   async function boot() {
     try {
-      const bootData = await invoke<AppBootData>('get_app_boot_data');
+      const bootData = await invokeNative<AppBootData>('get_app_boot_data');
       if (bootData.lastWorkspace) {
         setWorkspace(bootData.lastWorkspace);
         setWorkspaceInput(bootData.lastWorkspace.rootPath);
@@ -159,7 +187,7 @@ function App() {
 
   async function refreshShell() {
     try {
-      const data = await invoke<CodraShellData>('get_codra_shell_data');
+      const data = await invokeNative<CodraShellData>('get_codra_shell_data');
       setWorkspace(data.workspace);
       setProvider(data.provider);
       setProviderHealth(data.providerHealth);
@@ -171,7 +199,7 @@ function App() {
       if (data.timeline.length) setTimeline(data.timeline);
     } catch {
       try {
-        setTools(await invoke<ToolDefinition[]>('list_registered_tools'));
+        setTools(await invokeNative<ToolDefinition[]>('list_registered_tools'));
       } catch {}
     }
   }
@@ -196,13 +224,13 @@ function App() {
       return;
     }
     try {
-      const summary = await invoke<WorkspaceSummary>('open_workspace', { path: workspaceInput.trim() });
+      const summary = await invokeNative<WorkspaceSummary>('open_workspace', { path: workspaceInput.trim() });
       setWorkspace(summary);
       notify('Workspace connected', 'success');
       addLocalTimeline('Workspace', `Connected to ${summary.rootPath}`);
       await refreshShell();
     } catch (error) {
-      notify(`Workspace open failed: ${String(error)}`, 'error');
+      notify(nativeErrorMessage('Workspace open', error), isDesktopBridgeUnavailable(error) ? 'warning' : 'error');
     }
   }
 
@@ -216,14 +244,14 @@ function App() {
     setActiveSubitem('New Task');
     try {
       const request: TaskRequest = { id: crypto.randomUUID(), intent: taskIntent.trim(), mode: 'auto' };
-      const plan = await invoke<ExecutionPlan>('submit_task_for_planning', { request });
-      const readyPlan = await invoke<ExecutionPlan>('update_plan_status', { planId: plan.id, status: 'ready_for_review' satisfies PlanStatus });
+      const plan = await invokeNative<ExecutionPlan>('submit_task_for_planning', { request });
+      const readyPlan = await invokeNative<ExecutionPlan>('update_plan_status', { planId: plan.id, status: 'ready_for_review' satisfies PlanStatus });
       setActivePlan(readyPlan);
       setTaskIntent('');
       notify('Plan ready for review', 'success');
       addLocalTimeline('Planner', `Created plan ${readyPlan.title}`, 'planner');
     } catch (error) {
-      notify(`Planning failed: ${String(error)}`, 'error');
+      notify(nativeErrorMessage('Planning', error), isDesktopBridgeUnavailable(error) ? 'warning' : 'error');
     } finally {
       setIsPlanning(false);
     }
@@ -235,12 +263,12 @@ function App() {
       return;
     }
     try {
-      const updated = await invoke<ExecutionPlan>('update_plan_status', { planId: activePlan.id, status });
+      const updated = await invokeNative<ExecutionPlan>('update_plan_status', { planId: activePlan.id, status });
       setActivePlan(updated);
       notify(`Plan ${status.replaceAll('_', ' ')}`, 'success');
       addLocalTimeline('Plan Review', `Plan marked ${status.replaceAll('_', ' ')}`, 'planner');
     } catch (error) {
-      notify(`Plan update failed: ${String(error)}`, 'error');
+      notify(nativeErrorMessage('Plan update', error), isDesktopBridgeUnavailable(error) ? 'warning' : 'error');
     }
   }
 
@@ -250,23 +278,23 @@ function App() {
       return;
     }
     try {
-      const execution = await invoke('start_execution', { plan: activePlan });
+      const execution = await invokeNative('start_execution', { plan: activePlan });
       addLocalTimeline('Executor', `Execution started: ${JSON.stringify(execution)}`, 'executor');
       notify('Execution started', 'success');
       await refreshShell();
     } catch (error) {
-      notify(`Execution failed: ${String(error)}`, 'error');
+      notify(nativeErrorMessage('Execution', error), isDesktopBridgeUnavailable(error) ? 'warning' : 'error');
     }
   }
 
   async function runHealthCheck() {
     try {
-      const health = await invoke<ProviderHealthResult>('check_provider_health');
+      const health = await invokeNative<ProviderHealthResult>('check_provider_health');
       setProviderHealth(health);
       notify(health.message, health.reachable ? 'success' : 'warning');
       addLocalTimeline('Provider', health.message, 'provider');
     } catch (error) {
-      notify(`Health check failed: ${String(error)}`, 'error');
+      notify(nativeErrorMessage('Health check', error), isDesktopBridgeUnavailable(error) ? 'warning' : 'error');
     }
   }
 
@@ -280,35 +308,35 @@ function App() {
         profileId: 'default',
         profileName: 'Default',
       };
-      const saved = await invoke<ProviderConfig>('save_provider_config', { config, apiKey: settingsForm.apiKey || null });
+      const saved = await invokeNative<ProviderConfig>('save_provider_config', { config, apiKey: settingsForm.apiKey || null });
       setProvider(saved);
       setSettingsForm((current) => ({ ...current, apiKey: '' }));
       addLocalTimeline('Provider', `Saved provider ${saved.kind} / ${saved.modelId}`, 'provider');
       await runHealthCheck();
     } catch (error) {
-      notify(`Provider save failed: ${String(error)}`, 'error');
+      notify(nativeErrorMessage('Provider save', error), isDesktopBridgeUnavailable(error) ? 'warning' : 'error');
     }
   }
 
   async function launchBrowser() {
     try {
-      setBrowser(await invoke<BrowserSessionState>('browser_launch_session'));
+      setBrowser(await invokeNative<BrowserSessionState>('browser_launch_session'));
       setViewMode('browser');
       setActiveSubitem('Live Browser');
       notify('Browser session ready', 'success');
       addLocalTimeline('Browser', 'Session launched', 'browser');
     } catch (error) {
-      notify(`Browser launch failed: ${String(error)}`, 'error');
+      notify(nativeErrorMessage('Browser launch', error), isDesktopBridgeUnavailable(error) ? 'warning' : 'error');
     }
   }
 
   async function closeBrowser() {
     try {
-      setBrowser(await invoke<BrowserSessionState>('browser_close_session'));
+      setBrowser(await invokeNative<BrowserSessionState>('browser_close_session'));
       notify('Browser session closed', 'info');
       addLocalTimeline('Browser', 'Session closed', 'browser');
     } catch (error) {
-      notify(`Browser close failed: ${String(error)}`, 'error');
+      notify(nativeErrorMessage('Browser close', error), isDesktopBridgeUnavailable(error) ? 'warning' : 'error');
     }
   }
 
@@ -319,37 +347,37 @@ function App() {
     }
     try {
       const action: BrowserActionRequest = { id: crypto.randomUUID(), kind: 'open_url', value: browserUrl.trim() };
-      const result = await invoke<BrowserActionResult>('execute_browser_action', { action });
+      const result = await invokeNative<BrowserActionResult>('execute_browser_action', { action });
       notify(result.message, result.success ? 'success' : 'warning');
-      setBrowser(await invoke<BrowserSessionState>('browser_get_session_state'));
+      setBrowser(await invokeNative<BrowserSessionState>('browser_get_session_state'));
       addLocalTimeline('Browser', `Navigate to ${browserUrl}`, 'browser');
     } catch (error) {
-      notify(`Browser navigation failed: ${String(error)}`, 'error');
+      notify(nativeErrorMessage('Browser navigation', error), isDesktopBridgeUnavailable(error) ? 'warning' : 'error');
     }
   }
 
   async function captureBrowser() {
     try {
       const action: BrowserActionRequest = { id: crypto.randomUUID(), kind: 'capture_screenshot', value: '' };
-      const result = await invoke<BrowserActionResult>('execute_browser_action', { action });
+      const result = await invokeNative<BrowserActionResult>('execute_browser_action', { action });
       notify(result.message, result.success ? 'success' : 'warning');
-      setBrowser(await invoke<BrowserSessionState>('browser_get_session_state'));
+      setBrowser(await invokeNative<BrowserSessionState>('browser_get_session_state'));
       addLocalTimeline('Browser', 'Screenshot captured', 'browser');
     } catch (error) {
-      notify(`Browser action failed: ${String(error)}`, 'error');
+      notify(nativeErrorMessage('Browser action', error), isDesktopBridgeUnavailable(error) ? 'warning' : 'error');
     }
   }
 
   async function runCargoCheck() {
     try {
-      const result = await invoke<{ stdout: string; stderr: string; exitCode: number }>('run_workspace_command', {
+      const result = await invokeNative<{ stdout: string; stderr: string; exitCode: number }>('run_workspace_command', {
         request: { command: 'cargo', args: ['check', '--workspace'] },
       });
       setTerminalOutput(`${result.stdout}\n${result.stderr}`.trim() || `Command exited ${result.exitCode}`);
       setUtilityTab('terminal');
       addLocalTimeline('Verifier', `cargo check exited ${result.exitCode}`, 'verifier');
     } catch (error) {
-      notify(`cargo check failed: ${String(error)}`, 'error');
+      notify(nativeErrorMessage('cargo check', error), isDesktopBridgeUnavailable(error) ? 'warning' : 'error');
     }
   }
 
@@ -378,9 +406,9 @@ function App() {
   }, [utilityTab, terminalOutput, providerHealth?.message, recentTimeline]);
 
   return (
-    <div className="codra-shell h-screen w-screen overflow-hidden bg-[#060910] text-zinc-100">
-      <div className="grid h-full grid-cols-[210px_324px_minmax(540px,1fr)_380px] grid-rows-[48px_minmax(0,1fr)_44px]">
-        <aside className="row-span-3 border-r border-white/[0.08] bg-[#070c14]/98 px-3 py-3">
+    <div className="codra-shell h-screen w-screen overflow-hidden text-zinc-100">
+      <div className="codra-grid grid h-full min-w-[1480px] grid-cols-[210px_324px_minmax(620px,1fr)_380px] grid-rows-[48px_minmax(0,1fr)_44px]">
+        <aside className="codra-sidebar row-span-3 border-r border-white/[0.08] px-3 py-3">
           <div className="mb-4 flex items-center gap-3 px-2">
             <img src={logo} alt="Codra" className="h-8 w-8" />
             <div>
@@ -441,7 +469,7 @@ function App() {
             {tools.length} tools
           </div>
         </aside>
-        <header className="col-span-3 flex items-center justify-between border-b border-white/[0.08] bg-[#070b12] px-4">
+        <header className="codra-topbar col-span-3 flex items-center justify-between border-b border-white/[0.08] px-4">
           <div className="mx-auto flex h-7 min-w-[380px] items-center justify-between rounded-md border border-white/[0.06] bg-[#111724] px-3 text-xs text-zinc-300">
             <span className="font-medium">{compactPath(workspace?.rootPath)}</span>
             <ChevronRight className="h-3.5 w-3.5 text-zinc-500" />
@@ -452,7 +480,7 @@ function App() {
             <button onClick={() => setViewMode('settings')} className="rounded-md border border-white/[0.08] bg-white/[0.04] p-1.5 text-zinc-300"><Settings className="h-4 w-4" /></button>
           </div>
         </header>
-        <section className="border-r border-white/[0.08] bg-[#090e16]">
+        <section className="codra-taskcol border-r border-white/[0.08]">
           <div className="flex h-full flex-col">
             <div className="border-b border-white/[0.08] p-4">
               <div className="mb-2 flex items-center justify-between">
@@ -487,7 +515,7 @@ function App() {
             </div>
           </div>
         </section>
-        <main className="flex min-w-0 flex-col overflow-hidden bg-[#070b12]">
+        <main className="codra-workspace flex min-w-0 flex-col overflow-hidden">
           <div className="flex h-10 items-center justify-between border-b border-white/[0.08] bg-[#0d111a] px-2">
             <div className="flex h-full items-center">
               {(relevantFiles.length ? relevantFiles : ['auth.ts', 'auth.controller.ts', 'auth.service.ts', 'user.model.ts', 'db.ts']).slice(0, 5).map((file, index) => (
@@ -517,7 +545,7 @@ function App() {
             </div>
           </div>
         </main>
-        <section className="border-l border-white/[0.08] bg-[#090e16]">
+        <section className="codra-context border-l border-white/[0.08]">
           <div className="flex h-10 items-center gap-4 border-b border-white/[0.08] px-4 text-xs">
             <button onClick={() => setRightTab('context')} className={rightTab === 'context' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}>Context</button>
             <button onClick={() => setRightTab('memory')} className={rightTab === 'memory' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}>Memory</button>
@@ -546,9 +574,9 @@ function App() {
             {rightTab === 'memory' && <div><div className="mb-2 text-sm font-semibold">Execution Memory</div><div className="rounded-md border border-white/[0.08] bg-white/[0.03] p-3 text-xs text-zinc-400">Recovered local session state is loaded into this panel.</div></div>}
           </div>
         </section>
-        <footer className="col-span-3 flex items-center gap-3 border-t border-white/[0.08] bg-[#070b12] px-4">
-          <div className="flex h-9 flex-1 items-center rounded-md border border-white/[0.08] bg-[#111722] px-3">{isPlanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin text-violet-300" /> : <Sparkles className="mr-2 h-4 w-4 text-violet-300" />}<input ref={taskInputRef} value={taskIntent} onChange={(event) => setTaskIntent(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && submitTask()} placeholder="Ask Codra to build, fix, or improve anything..." className="h-full flex-1 bg-transparent text-sm text-zinc-100 outline-none placeholder:text-zinc-500" /><button onClick={submitTask} className="rounded bg-violet-600 p-1.5 text-white"><Send className="h-4 w-4" /></button></div>
-          <div className="flex items-center gap-2"><Folder className="h-4 w-4 text-zinc-500" /><input value={workspaceInput} onChange={(event) => setWorkspaceInput(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && openWorkspace()} placeholder="C:\\path\\to\\repo" className="h-9 w-64 rounded-md border border-white/[0.08] bg-[#111722] px-3 text-xs outline-none" /><button onClick={openWorkspace} className="h-9 rounded-md bg-white/[0.07] px-3 text-xs hover:bg-white/[0.12]">Connect</button></div>
+        <footer className="codra-commandbar col-span-3 flex items-center gap-3 border-t border-white/[0.08] px-4">
+          <div className="flex h-9 flex-1 items-center rounded-md border border-white/[0.08] bg-[#111722] px-3">{isPlanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin text-violet-300" /> : <Sparkles className="mr-2 h-4 w-4 text-violet-300" />}<input ref={taskInputRef} value={taskIntent} onChange={(event) => setTaskIntent(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && submitTask()} placeholder="Ask Codra to build, fix, or improve anything..." aria-label="Codra command input" data-testid="codra-command-input" className="h-full flex-1 bg-transparent text-sm text-zinc-100 outline-none placeholder:text-zinc-500" /><button onClick={submitTask} aria-label="Submit Codra task" className="rounded bg-violet-600 p-1.5 text-white"><Send className="h-4 w-4" /></button></div>
+          <div className="flex items-center gap-2"><Folder className="h-4 w-4 text-zinc-500" /><input value={workspaceInput} onChange={(event) => setWorkspaceInput(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && openWorkspace()} placeholder="C:\\path\\to\\repo" aria-label="Workspace path" data-testid="workspace-path-input" className="h-9 w-64 rounded-md border border-white/[0.08] bg-[#111722] px-3 text-xs outline-none" /><button onClick={openWorkspace} className="h-9 rounded-md bg-white/[0.07] px-3 text-xs hover:bg-white/[0.12]">Connect</button></div>
           <button onClick={refreshShell} className="flex items-center gap-2 text-xs text-zinc-500 hover:text-zinc-300"><span className="h-2 w-2 rounded-full bg-emerald-400" />All Systems Operational<ExternalLink className="h-3.5 w-3.5" /></button>
         </footer>
       </div>
@@ -570,3 +598,5 @@ function App() {
 }
 
 export default App;
+
+

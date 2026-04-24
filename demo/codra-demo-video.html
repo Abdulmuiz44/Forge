@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Codra Demo Video</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #05070c;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      canvas {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="stage" width="1920" height="1080"></canvas>
+    <script>
+      const canvas = document.getElementById('stage');
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width;
+      const H = canvas.height;
+      const DURATION = 30;
+      const FPS = 30;
+
+      const palette = {
+        bg: '#05070c',
+        panel: '#0b1019',
+        panel2: '#101722',
+        border: 'rgba(255,255,255,0.10)',
+        text: '#e7ebff',
+        muted: '#94a0c6',
+        accent: '#6d5ef7',
+        cyan: '#42d8ff',
+        green: '#22c55e',
+        amber: '#f59e0b',
+      };
+
+      function loadImage(src) {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = () => resolve(null);
+          img.src = src;
+        });
+      }
+
+      const assetsPromise = Promise.all([
+        loadImage('../assets/codra_interface.png'),
+        loadImage('../assets/codra-logo-horizontal-dark.png'),
+        loadImage('../assets/codra-icon-only.png'),
+        loadImage('../codra-fixed-click-test.png'),
+      ]).then(([interfaceImage, logo, icon, browserShot]) => ({ interfaceImage, logo, icon, browserShot }));
+
+      function clamp(v, min = 0, max = 1) {
+        return Math.max(min, Math.min(max, v));
+      }
+
+      function ease(t) {
+        t = clamp(t);
+        return 1 - Math.pow(1 - t, 3);
+      }
+
+      function sceneProgress(time, start, end) {
+        return clamp((time - start) / (end - start));
+      }
+
+      function roundedRect(x, y, w, h, r) {
+        const radius = Math.min(r, w / 2, h / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.arcTo(x + w, y, x + w, y + h, radius);
+        ctx.arcTo(x + w, y + h, x, y + h, radius);
+        ctx.arcTo(x, y + h, x, y, radius);
+        ctx.arcTo(x, y, x + w, y, radius);
+        ctx.closePath();
+      }
+
+      function fillRound(x, y, w, h, r, fill, stroke = null) {
+        roundedRect(x, y, w, h, r);
+        ctx.fillStyle = fill;
+        ctx.fill();
+        if (stroke) {
+          ctx.strokeStyle = stroke;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+      }
+
+      function text(value, x, y, size, color = palette.text, weight = 600, maxWidth = undefined) {
+        ctx.fillStyle = color;
+        ctx.font = `${weight} ${size}px Inter, Segoe UI, sans-serif`;
+        ctx.fillText(value, x, y, maxWidth);
+      }
+
+      function wrapText(value, x, y, size, lineHeight, color, weight, maxWidth) {
+        ctx.font = `${weight} ${size}px Inter, Segoe UI, sans-serif`;
+        ctx.fillStyle = color;
+        const words = value.split(' ');
+        let line = '';
+        for (const word of words) {
+          const next = line ? `${line} ${word}` : word;
+          if (ctx.measureText(next).width > maxWidth && line) {
+            ctx.fillText(line, x, y);
+            y += lineHeight;
+            line = word;
+          } else {
+            line = next;
+          }
+        }
+        if (line) ctx.fillText(line, x, y);
+      }
+
+      function drawBackground(time) {
+        const gradient = ctx.createLinearGradient(0, 0, W, H);
+        gradient.addColorStop(0, '#05070c');
+        gradient.addColorStop(0.45, '#07101c');
+        gradient.addColorStop(1, '#0a0714');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, W, H);
+
+        ctx.globalAlpha = 0.4;
+        for (let i = 0; i < 12; i++) {
+          const x = ((i * 233 + time * 18) % (W + 260)) - 130;
+          const y = 120 + ((i * 97) % 820);
+          ctx.strokeStyle = i % 2 ? 'rgba(109,94,247,0.16)' : 'rgba(66,216,255,0.11)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x + 180, y + 36);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      function drawChromeFrame(img, x, y, w, h, alpha = 1) {
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        fillRound(x - 18, y - 44, w + 36, h + 70, 16, 'rgba(10,15,25,0.92)', palette.border);
+        fillRound(x - 6, y - 32, w + 12, 28, 10, '#111827', 'rgba(255,255,255,0.08)');
+        for (let i = 0; i < 3; i++) {
+          ctx.beginPath();
+          ctx.fillStyle = ['#ef4444', '#f59e0b', '#22c55e'][i];
+          ctx.arc(x + 12 + i * 22, y - 18, 6, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        if (img) {
+          roundedRect(x, y, w, h, 10);
+          ctx.clip();
+          const scale = Math.max(w / img.width, h / img.height);
+          const iw = img.width * scale;
+          const ih = img.height * scale;
+          ctx.drawImage(img, x + (w - iw) / 2, y + (h - ih) / 2, iw, ih);
+        } else {
+          fillRound(x, y, w, h, 10, '#0b1019', 'rgba(255,255,255,0.08)');
+        }
+        ctx.restore();
+      }
+
+      function badge(label, x, y, color = palette.accent) {
+        ctx.font = '600 24px Inter, Segoe UI, sans-serif';
+        const width = ctx.measureText(label).width + 34;
+        fillRound(x, y, width, 42, 10, `${color}22`, `${color}77`);
+        text(label, x + 17, y + 29, 20, palette.text, 600);
+      }
+
+      function featureCard(title, body, x, y, w, index, color) {
+        fillRound(x, y, w, 140, 14, 'rgba(16,23,34,0.86)', palette.border);
+        ctx.beginPath();
+        ctx.fillStyle = color;
+        ctx.arc(x + 34, y + 38, 10, 0, Math.PI * 2);
+        ctx.fill();
+        text(title, x + 58, y + 45, 25, palette.text, 700);
+        wrapText(body, x + 26, y + 86, 19, 27, palette.muted, 500, w - 52);
+      }
+
+      function drawScene(time, assets) {
+        drawBackground(time);
+
+        const intro = sceneProgress(time, 0, 5);
+        const shell = sceneProgress(time, 4, 11);
+        const loop = sceneProgress(time, 10, 17);
+        const tools = sceneProgress(time, 16, 23);
+        const close = sceneProgress(time, 23, 30);
+
+        if (time < 6) {
+          const y = 405 - ease(intro) * 42;
+          if (assets.icon) ctx.drawImage(assets.icon, 820, y - 92, 92, 92);
+          text('Codra', 930, y - 35, 72, palette.text, 800);
+          wrapText('A local-first AI coding agent for serious engineering work.', 590, y + 36, 34, 46, palette.muted, 500, 790);
+          badge('Plan', 710, y + 150, palette.accent);
+          badge('Execute', 825, y + 150, palette.cyan);
+          badge('Verify', 980, y + 150, palette.green);
+          badge('Repair', 1122, y + 150, palette.amber);
+        }
+
+        if (time >= 4 && time < 14) {
+          const p = ease(shell);
+          const x = 190 + (1 - p) * 90;
+          const y = 185 + (1 - p) * 35;
+          drawChromeFrame(assets.browserShot || assets.interfaceImage, x, y, 1540, 740, p);
+          fillRound(222, 782, 430 * p, 8, 4, palette.accent);
+          if (time > 6) {
+            wrapText('A premium desktop shell: navigation, task plan, code diff, terminal activity, context, memory, and browser state in one focused workspace.', 260, 895, 29, 42, palette.text, 650, 1360);
+          }
+        }
+
+        if (time >= 10 && time < 20) {
+          const p = ease(loop);
+          const left = 190;
+          const top = 230;
+          const gap = 34;
+          const cardW = 360;
+          const cards = [
+            ['Planner', 'Scans the repo, builds an approval-ready plan, and identifies relevant files.', palette.accent],
+            ['Executor', 'Runs typed tools, proposes patches, and records every action to the journal.', palette.cyan],
+            ['Verifier', 'Runs real build, test, lint, and typecheck commands against the workspace.', palette.green],
+            ['Repair', 'Classifies failures and retries within a bounded budget before stopping.', palette.amber],
+          ];
+          cards.forEach(([titleValue, body, color], index) => {
+            const offset = Math.max(0, p * 5 - index);
+            featureCard(titleValue, body, left + index * (cardW + gap), top + (1 - ease(offset)) * 70, cardW, index, color);
+          });
+          text('Production-shaped agent loop', 190, 160, 48, palette.text, 800);
+          wrapText('Codra keeps the model, tools, approvals, verification, and recovery state explicit.', 190, 595, 30, 42, palette.muted, 500, 1120);
+        }
+
+        if (time >= 16 && time < 26) {
+          const p = ease(tools);
+          text('Local-first, provider-flexible, plugin-ready', 190, 155, 48, palette.text, 800);
+          const items = [
+            ['Multi-provider routing', 'OpenAI-compatible APIs, Ollama, Claude-style providers, Gemini, Bedrock/Vertex paths, and mock mode.'],
+            ['MCP and skills', 'Typed tools for filesystem, git, shell, browser, computer use, deploy prep, design, and research.'],
+            ['Durable workspace memory', '~/.codra persistence, recovered sessions, timelines, artifacts, and legacy .forge migration.'],
+          ];
+          items.forEach(([titleValue, body], index) => {
+            const y = 245 + index * 180;
+            fillRound(190 + (1 - p) * 60, y, 760, 132, 14, 'rgba(16,23,34,0.86)', palette.border);
+            text(titleValue, 230 + (1 - p) * 60, y + 45, 28, palette.text, 750);
+            wrapText(body, 230 + (1 - p) * 60, y + 85, 21, 30, palette.muted, 500, 660);
+          });
+          drawChromeFrame(assets.interfaceImage, 1035 - (1 - p) * 50, 245, 670, 382, p);
+          fillRound(1060, 690, 610, 120, 14, 'rgba(109,94,247,0.15)', 'rgba(109,94,247,0.38)');
+          text('No hidden telemetry. No silent destructive actions.', 1100, 737, 27, palette.text, 750);
+          text('Approvals and safety modes stay visible.', 1100, 777, 22, palette.muted, 550);
+        }
+
+        if (time >= 23) {
+          const p = ease(close);
+          ctx.globalAlpha = p;
+          fillRound(400, 225, 1120, 590, 22, 'rgba(8,12,20,0.88)', 'rgba(255,255,255,0.11)');
+          if (assets.logo) ctx.drawImage(assets.logo, 700, 330, 520, 128);
+          else text('Codra', 780, 400, 82, palette.text, 800);
+          text('Native local AI coding agent', 620, 520, 48, palette.text, 800);
+          wrapText('Plan work. Edit safely. Verify with real commands. Recover context across sessions.', 570, 585, 31, 44, palette.muted, 500, 800);
+          badge('Local-first', 685, 690, palette.green);
+          badge('Open-source', 865, 690, palette.accent);
+          badge('Developer-native', 1060, 690, palette.cyan);
+          ctx.globalAlpha = 1;
+        }
+      }
+
+      async function renderCodraDemo() {
+        const assets = await assetsPromise;
+        const stream = canvas.captureStream(FPS);
+        const recorder = new MediaRecorder(stream, {
+          mimeType: 'video/webm;codecs=vp9',
+          videoBitsPerSecond: 6500000,
+        });
+        const chunks = [];
+        recorder.ondataavailable = (event) => {
+          if (event.data.size) chunks.push(event.data);
+        };
+        const stopped = new Promise((resolve) => {
+          recorder.onstop = resolve;
+        });
+        recorder.start(250);
+        const start = performance.now();
+
+        await new Promise((resolve) => {
+          function tick(now) {
+            const time = Math.min((now - start) / 1000, DURATION);
+            drawScene(time, assets);
+            if (time < DURATION) requestAnimationFrame(tick);
+            else resolve();
+          }
+          requestAnimationFrame(tick);
+        });
+
+        recorder.stop();
+        await stopped;
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        const dataUrl = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.readAsDataURL(blob);
+        });
+        return dataUrl;
+      }
+
+      window.renderCodraDemo = renderCodraDemo;
+      assetsPromise.then((assets) => drawScene(0, assets));
+    </script>
+  </body>
+</html>

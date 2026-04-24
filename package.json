@@ -7,6 +7,14 @@
   },
   "scripts": {
     "dev": "pnpm -r --parallel run dev",
-    "build": "pnpm -r run build"
+    "build": "pnpm -r run build",
+    "design:lint": "npx @google/design.md lint DESIGN.md",
+    "design:spec": "npx @google/design.md spec --rules",
+    "design:export:tailwind": "npx @google/design.md export --format tailwind DESIGN.md > design_tokens.tailwind.json",
+    "design:export:dtcg": "npx @google/design.md export --format dtcg DESIGN.md > design_tokens.dtcg.json",
+    "video:demo": "node scripts/render-codra-demo-video.cjs"
+  },
+  "devDependencies": {
+    "@google/design.md": "0.1.1"
   }
 }

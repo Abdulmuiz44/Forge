@@ -6,14 +6,17 @@ This Monorepo houses Codra: an open-source, local-first Native AI coding agent e
 ## Canonical Docs to Read First
 1. `docs/PLAN.md`: Ground truth for vision and goals.
 2. `docs/ARCHITECTURE.md`: High-level system interaction graph.
+3. `DESIGN.md`: Canonical design system tokens and rationale for UI/design work.
 
 ## Expectations for Agents
 - When engaging with this repository, always align modifications with the core architecture laid out in `docs/ARCHITECTURE.md`.
 - Be highly precise with modifications in `apps/desktop` vs crates. Do not mix system logic into pure UI implementations.
+- For any design, UX, styling, component, layout, or visual-system task, read and apply `DESIGN.md` before making changes.
 
 ## Change Policy
 - Feature work requires tests if extending Rust capabilities.
 - UI changes require Tailwind adherence and Dark-mode-first CSS values.
+- UI/design decisions must follow `DESIGN.md` tokens and rationale unless the user explicitly asks to deviate.
 
 ## Safety Constraints
 - Only interact with paths mapped in `.codra` or configured user directories.
